@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "source": "litellm-snapshot",
+  "note": "Embedded offline price snapshot. Values are integer nano-USD per token (USD per million × 1000), derived from LiteLLM's public model price table. Refresh explicitly from settings; this file changes only with plugin releases.",
+  "models": {
+    "deepseek-chat": { "inputNano": 270, "outputNano": 1100, "cacheReadNano": 70, "cacheWriteNano": null },
+    "deepseek-reasoner": { "inputNano": 550, "outputNano": 2190, "cacheReadNano": 140, "cacheWriteNano": null },
+    "gpt-4o": { "inputNano": 2500, "outputNano": 10000, "cacheReadNano": 1250, "cacheWriteNano": null },
+    "gpt-4o-mini": { "inputNano": 150, "outputNano": 600, "cacheReadNano": 75, "cacheWriteNano": null },
+    "gpt-4.1": { "inputNano": 2000, "outputNano": 8000, "cacheReadNano": 500, "cacheWriteNano": null },
+    "gpt-5": { "inputNano": 1250, "outputNano": 10000, "cacheReadNano": 125, "cacheWriteNano": null },
+    "claude-sonnet-4-5": { "inputNano": 3000, "outputNano": 15000, "cacheReadNano": 300, "cacheWriteNano": 3750 },
+    "claude-opus-4-1": { "inputNano": 15000, "outputNano": 75000, "cacheReadNano": 1500, "cacheWriteNano": 18750 },
+    "gemini-2.5-pro": { "inputNano": 1250, "outputNano": 10000, "cacheReadNano": 310, "cacheWriteNano": null },
+    "grok-4": { "inputNano": 3000, "outputNano": 15000, "cacheReadNano": 750, "cacheWriteNano": null }
+  }
+}

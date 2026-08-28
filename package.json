@@ -1,0 +1,63 @@
+{
+  "name": "dsh-token-usage",
+  "version": "0.1.0",
+  "description": "Local token usage and cost ledger for DeepSeek Harness: historical import, live capture, project/model/provider analytics, and a profile-style dashboard. No telemetry, no prompts stored.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "dsh-token-usage": "bin/install.js"
+  },
+  "files": [
+    "bin/install.js",
+    "cordis.patch.yml",
+    "lib",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check lib/*.js && node --check lib/ledger/*.js && node --check bin/install.js && node --test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shaomingbo/dsh-token-usage.git"
+  },
+  "homepage": "https://github.com/shaomingbo/dsh-token-usage#readme",
+  "bugs": {
+    "url": "https://github.com/shaomingbo/dsh-token-usage/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "cordis",
+    "token-usage",
+    "cost",
+    "analytics",
+    "web-gui"
+  ],
+  "author": "shaomingbo",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  }
+}
