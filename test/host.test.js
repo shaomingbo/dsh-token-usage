@@ -119,6 +119,17 @@ test('apply imports history, serves the loopback channel, and folds live events'
     assert.equal(after.value.totals.calls, 2)
     assert.equal(after.value.totals.processingTokens, 165)
 
+    // A failure arriving after a reported usage sample must never wipe it.
+    eventListeners.get('session/event')(liveSession, {
+      type: 'step/end',
+      seq: 3,
+      time: T0 + 1003,
+      data: { turn: 0, step: 0, error: 'LlmFailure' },
+    })
+    const guarded = await channel.handler('overview', {})
+    assert.equal(guarded.value.totals.calls, 2)
+    assert.equal(guarded.value.totals.processingTokens, 165)
+
     // Requests endpoint serves paged rows.
     const requests = await channel.handler('requests', {})
     assert.equal(requests.ok, true)

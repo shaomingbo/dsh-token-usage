@@ -56,6 +56,7 @@ npx --yes github:shaomingbo/dsh-token-usage#v0.1.0 --source link:$PWD
 ## 限制
 
 - 用量是 Harness 可观测的账目，不是上游账单：从未进入会话日志的 provider 内部重试不可观测，也不会被猜测。
+- 估算 seam 已在账本层实现并有测试，但 v0.1 尚未在 host 侧接上 Harness token meter，因此缺失 usage 的步骤保持「未知」而非估算。
 - 已在 DSH 0.1.1-rc.2 验证，启动时做能力检查；不支持的运行时会得到明确诊断而非静默错算。
 - 预算/告警、agent/skill 归因、非 DSH CLI 导入、云同步、自动汇率不在 v0.1 范围内。见 [SPEC.md](SPEC.md)。
 

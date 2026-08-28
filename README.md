@@ -56,6 +56,7 @@ No telemetry. No network requests by default. Prompts, responses, tool arguments
 ## Limitations
 
 - Usage is a Harness-observed account, not an upstream invoice: provider-internal retries that never reached the session log are not observable and not guessed.
+- The estimation seam is implemented and tested at the ledger level, but v0.1 does not yet attach the Harness token meter on the host side, so usage-less steps stay "unknown" rather than estimated.
 - Verified against DSH 0.1.1-rc.2 with capability checks at startup; unsupported runtimes get a clear diagnostic instead of silent miscounting.
 - Budgets/alerts, agent-skill attribution, non-DSH CLI imports, cloud sync, and automatic exchange rates are out of scope for v0.1. See [SPEC.md](SPEC.md).
 
