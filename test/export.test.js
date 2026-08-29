@@ -45,10 +45,16 @@ test('JSON report anonymizes projects and opaque session ids', () => {
   const report = reportToJson({
     totals: { requests: 2 },
     sessions: [{ id: 'abcdefgh', cwd: '/Users/somebody/work/repo', parentSession: 'ijklmn', requests: 2 }],
+    filter: { project: ['cwd:/Users/somebody/work/repo'] },
+    analysis: { rankings: { dimension: 'project', rows: [{ key: 'cwd:/Users/somebody/work/repo', label: '/Users/somebody/work/repo' }] } },
   })
   assert.equal(report.sessions[0].id, 'session-1')
   assert.equal(report.sessions[0].parentSession, 'session-2')
   assert.equal(report.sessions[0].cwd, 'project-1')
+  assert.deepEqual(report.filter.project, ['project-1'])
+  assert.equal(report.analysis.rankings.rows[0].key, 'project-1')
+  assert.equal(report.analysis.rankings.rows[0].label, 'project-1')
+  assert.ok(!JSON.stringify(report).includes('/Users/somebody'))
   const complete = reportToJson({ id: 'abcdefgh' }, { anonymize: false })
   assert.equal(complete.id, 'abcdefgh')
 })
@@ -74,7 +80,7 @@ test('backup and replace-restore round-trip the ledger', () => {
 
     // Simulate a schema-v1 backup: restore must tolerate tables added later.
     const legacy = new DatabaseSync(backupPath)
-    legacy.exec('DROP TABLE price_updates')
+    legacy.exec('DROP TABLE price_updates; DROP TABLE request_corrections; DROP TABLE budgets; DROP TABLE project_sources; DROP TABLE projects;')
     legacy.prepare("UPDATE meta SET value = '1' WHERE key = 'schema_version'").run()
     legacy.close()
 
@@ -86,6 +92,8 @@ test('backup and replace-restore round-trip the ledger', () => {
     const totals = restored.getOverview({ timezone: 'UTC' }).totals
     assert.equal(totals.calls, 1)
     assert.equal(totals.processingTokens, 15)
+    assert.equal(restored.listProjects().length, 1)
+    assert.equal(restored.listProjects()[0].sources[0], '/work/repo-a')
     restored.dispose()
   } finally {
     env.cleanup()

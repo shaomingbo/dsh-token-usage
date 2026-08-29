@@ -37,12 +37,14 @@ The installer only ever edits two slots in `profiles/<name>/package.json` — `d
 
 ## What you get
 
-- **Sidebar usage entry** with an optional today summary, opening a full-frame dashboard: overview, requests, sessions, models, providers, pricing, data, settings. Follows the Harness theme and both locales.
+- **Four-space analytics workbench** — Overview, Explore, Cost & Budget, and Data & Settings share one global scope. Click trend buckets and ranked dimensions to narrow; inspect projects/models/providers → sessions → requests in a stacked drawer without losing context. Follows the Harness theme, keyboard navigation, responsive layouts, and both locales.
+- **Unified analytics** — 30-day reported-only default, previous equal-period comparison, processing/new-compute/current-rule cost/request metrics, bounded stacked trends, composition, ranked dimensions, 12-month activity, weekday/hour rhythm, neutral session labels, and at most three deterministic evidence-backed findings.
+- **Local controls** — Git/manual project identities can be merged, split, renamed, colored, or hidden; request corrections/exclusions are append-only and undoable; natural-month budgets support profile/project/provider/model scopes and USD/processing/new-compute units with conservative forecast gates.
 - **Automatic history import** — sessions from before installation are imported read-only in the background (pausable, cancelable, resumable). Missed live events are reconciled from the durable log.
 - **Correct counting** — one observable model call per session/turn/step; repeated usage samples replace instead of adding; fork-inherited seed prefixes are never double-counted; subagent usage counts once in its own session and rolls up through lineage; compaction never bills; reasoning tokens stay a labeled subset of output.
 - **Honest cost** — estimates use an embedded versioned snapshot plus an optional, explicit LiteLLM refresh. Preview the source and observed-model matches before applying; no background fetch occurs. Provider-compatible unique matches apply automatically, while cross-provider candidates require an explicit alias chosen from observed/catalog dropdowns. Custom prices and provider multipliers remain available. Original valuations are immutable; current-rule revaluation changes immediately. Unknown prices are excluded and reported as coverage, never guessed.
 - **Reported vs estimated** — provider-reported usage and in-memory estimates are separated at every level; failed requests count as requests but never fabricate tokens or cost.
-- **Your data, your machine** — a profile-private SQLite ledger (built-in `node:sqlite`, no native deps). CSV/JSON exports anonymize paths and session ids by default; complete backups are a separate, privacy-flagged operation. Purge request details while keeping anonymous day-level totals. Uninstall keeps your ledger.
+- **Your data, your machine** — a profile-private SQLite ledger (built-in `node:sqlite`, no native deps). CSV/JSON exports inherit the current filter and anonymize paths and session ids by default; complete backups are a separate, privacy-flagged operation. Purge request details while keeping anonymous day-level totals. Uninstall keeps your ledger.
 - **No patching** — the plugin composes through documented Harness extension points only (bundle rows, slots, loopback RPC, read-only persistence APIs).
 
 ## Privacy
@@ -58,13 +60,14 @@ No telemetry. No network requests by default. Prompts, responses, tool arguments
 - Usage is a Harness-observed account, not an upstream invoice: provider-internal retries that never reached the session log are not observable and not guessed.
 - The estimation seam is implemented and tested at the ledger level, but v0.1 does not yet attach the Harness token meter on the host side, so usage-less steps stay "unknown" rather than estimated.
 - Verified against DSH 0.1.1-rc.2 with capability checks at startup; unsupported runtimes get a clear diagnostic instead of silent miscounting.
-- Budgets/alerts, agent-skill attribution, non-DSH CLI imports, cloud sync, and automatic exchange rates are out of scope for v0.1. See [SPEC.md](SPEC.md).
+- Alert automation, bill/quota reconciliation, agent-skill-tool attribution, cross-profile aggregation, cloud sync, and automatic exchange rates remain out of scope. See [V2-PLAN.md](V2-PLAN.md).
 
 ## Development
 
 ```sh
 pnpm install          # or npm install
 npm run check         # syntax + full test suite (node --test)
+npm run bench:v2      # 100k requests / 10k sessions analytics benchmark
 npm pack --dry-run    # verify the published artifact
 ```
 

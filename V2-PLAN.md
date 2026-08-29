@@ -341,6 +341,12 @@ RPC 只作为薄适配器，不重复聚合。筛选、时区、ownership、估�
 
 原型不得连接或修改真实账本。
 
+原型已在独立 `prototype/v2-workbench` 分支的 `2b38793` 提交中留档。用户确认生产版采用混合方案：
+
+- 总览采用 A 的分带式分析结构。
+- 探索采用 B 的三栏调查工作台。
+- 确定性洞察采用 C 的证据式表达，但压缩为最多三条，不把整页改为叙事流。
+
 ### 四个内部里程碑
 
 1. **分析底座**：schema 迁移、项目身份、请求元数据回填、统一 Filter、query/inspect、游标、revision、性能基准。
@@ -349,6 +355,15 @@ RPC 只作为薄适配器，不重复聚合。筛选、时区、ownership、估�
 4. **硬化验收**：10 万请求基准、历史迁移、真实 GUI、主题、locale、键盘、响应式、Console、网络和 Lighthouse。
 
 四个里程碑全部通过后再发布 v2，不拆成多个公开半成品版本。
+
+### 实现与验收记录（2026-08-29）
+
+- 统一深层接口已落在 `lib/ledger/analytics.js`：`constrain(filter, patch)`、`query(spec)`、`inspect(ref)`；host RPC 仅做薄适配。
+- schema v3、稳定项目身份、Git/worktree 识别、请求元数据、追加式修正/撤销、自然月预算、持久 revision 与按 revision 物化/缓存已完成。
+- 生产 UI 已采用确认的 A 总览 + B 探索 + C 证据式洞察，保留四空间、全局 scope、详情栈、保存视图和筛选一致导出；原型切换器未进入生产 bundle。
+- `npm run check` 通过 64 项测试；`npm pack --dry-run` 与 `git diff --check` 通过。代码审查发现的项目路径导出泄漏、恢复竞态、时区边界、修正审计、历史恢复和有界载荷问题已修复并补回归测试。
+- 10 万请求 / 1 万会话基准：交互筛选 p95 6.85ms，缓存 p95 0ms，满足 100ms 目标；首次构建 revision 物化表约 868ms，仅在冷启动或 ledger revision 变化后发生一次。
+- 已在现有 `http://127.0.0.1:3080` 验证总览收窄、探索会话→请求详情栈与 Esc 回退、成本/预算、可搜索定价、项目治理，以及 1440/1000/390px、明暗主题。Token Usage RPC 均为 200，Console 无 error/warn；Lighthouse snapshot 为 Accessibility 93、Best Practices 100，剩余失败主要来自 DSH shell，会话侧栏摘要的可访问名称已在插件源码修正；性能 trace CLS 为 0.00。
 
 ## 16. v2 明确不包含
 

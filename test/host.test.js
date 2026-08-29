@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { apply, resolveDataDir, name as pluginName, inject } from '../lib/index.js'
+import { apply, resolveDataDir, detectGitProject, name as pluginName, inject } from '../lib/index.js'
 
 const T0 = Date.UTC(2026, 6, 10, 8, 0, 0)
 
@@ -91,6 +91,33 @@ test('data dir falls back to the home level for linked development sources', () 
   }
 })
 
+test('git project identity follows the repository root and strips remote credentials', () => {
+  const env = tempHome()
+  try {
+    const root = join(env.home, 'repo')
+    const nested = join(root, 'packages', 'web')
+    mkdirSync(join(root, '.git'), { recursive: true })
+    mkdirSync(nested, { recursive: true })
+    writeFileSync(join(root, '.git', 'config'), '[remote "origin"]\n  url = https://token@example.com/acme/repo.git\n')
+    assert.deepEqual(detectGitProject(nested), {
+      gitRoot: realpathSync(root),
+      gitRemote: 'example.com/acme/repo',
+      identityKind: 'git',
+      identityValue: 'example.com/acme/repo',
+      displayName: 'repo',
+    })
+    const worktree = join(env.home, 'worktree')
+    const gitdir = join(root, '.git', 'worktrees', 'worktree')
+    mkdirSync(gitdir, { recursive: true })
+    mkdirSync(worktree, { recursive: true })
+    writeFileSync(join(worktree, '.git'), `gitdir: ${gitdir}\n`)
+    writeFileSync(join(gitdir, 'commondir'), '../..\n')
+    assert.equal(detectGitProject(worktree).gitRemote, 'example.com/acme/repo')
+  } finally {
+    env.cleanup()
+  }
+})
+
 test('apply imports history, serves the loopback channel, and folds live events', async () => {
   process.env.DSH_HOME = tempHome().home
   const { cleanup } = { cleanup: () => rmSync(process.env.DSH_HOME, { recursive: true, force: true }) }
@@ -152,6 +179,26 @@ test('apply imports history, serves the loopback channel, and folds live events'
     const requests = await channel.handler('requests', {})
     assert.equal(requests.ok, true)
     assert.equal(requests.value.rows.length, 2)
+
+    // V2 exposes the deep analytics seams through one loopback RPC channel.
+    const analysis = await channel.handler('query', {
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['kpis', 'rankings'],
+      ranking: { dimension: 'project' },
+    })
+    assert.equal(analysis.ok, true)
+    assert.equal(analysis.value.kpis.processingTokens, 165)
+    assert.equal(analysis.value.rankings.rows[0].key.startsWith('cwd:'), true)
+    const narrowed = await channel.handler('constrain', { filter: {}, patch: { op: 'add', dimension: 'model', key: 'deepseek-chat' } })
+    assert.deepEqual(narrowed.value.model, ['deepseek-chat'])
+    const inspected = await channel.handler('inspect', { kind: 'session', id: 's1', filter: { timezone: 'UTC' } })
+    assert.equal(inspected.value.direct.processingTokens, 150)
+    const correction = await channel.handler('correct-request', { id: 's1:0:0', correction: { inputTokens: 8, outputTokens: 2, note: 'fixture' } })
+    assert.equal(correction.ok, true)
+    assert.equal((await channel.handler('inspect', { kind: 'request', id: 's1:0:0' })).value.direct.processingTokens, 10)
+    assert.equal((await channel.handler('revoke-correction', { id: correction.value.id })).ok, true)
+    const budget = await channel.handler('set-budget', { scope: 'profile', unit: 'processingTokens', periodMonth: '2026-07', limitValue: '1000' })
+    assert.equal(budget.ok, true)
 
     // Price refresh is explicit: preview fetches and reports mappings, then
     // apply persists that exact in-memory preview without another network call.

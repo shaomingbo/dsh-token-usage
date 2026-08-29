@@ -70,6 +70,15 @@ test('client carries both locale dictionaries', () => {
   assert.match(source, /const en = \{/)
 })
 
+test('client presents the confirmed four-space v2 workbench over unified query and inspect RPCs', () => {
+  for (const label of ['总览', '探索', '成本与预算', '数据与设置']) assert.ok(source.includes(label), `missing ${label}`)
+  for (const endpoint of ["'query'", "'inspect'", "'constrain'"]) assert.ok(source.includes(endpoint), `missing ${endpoint} RPC`)
+  assert.match(source, /15_000/)
+  assert.match(source, /state\.restored \? h\(Workbench/)
+  assert.ok(!source.includes('contain:strict'), 'virtual stream must retain a measurable height')
+  assert.ok(!source.includes('variant switcher'), 'production bundle must not ship the prototype switcher')
+})
+
 test('client uses host theme variables and never talks to the network directly', () => {
   assert.match(source, /var\(--dsw-/)
   assert.ok(!/https?:\/\//.test(source), 'no hardcoded remote URLs')

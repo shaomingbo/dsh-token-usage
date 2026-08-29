@@ -24,6 +24,20 @@ test('fresh databases open at the current schema version', () => {
   }
 })
 
+test('v2 schema stores project identities, request metadata, corrections, and budgets', () => {
+  const db = openDatabase(':memory:')
+  try {
+    const requestColumns = new Set(db.prepare("PRAGMA table_info('requests')").all().map((row) => row.name))
+    assert.ok(requestColumns.has('duration_ms'))
+    assert.ok(requestColumns.has('end_reason'))
+    assert.ok(requestColumns.has('failure_type'))
+    const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name))
+    for (const name of ['projects', 'project_sources', 'request_corrections', 'budgets']) assert.ok(tables.has(name), `missing ${name}`)
+  } finally {
+    db.close()
+  }
+})
+
 test('a database written by a newer schema refuses to open and stays untouched', () => {
   const env = tempDir()
   try {
