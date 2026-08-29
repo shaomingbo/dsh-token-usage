@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { createLedgerService } from '../lib/ledger/service.js'
 import { requestsToCsv, reportToJson } from '../lib/ledger/export.js'
 import { nanoToUsdString } from '../lib/ledger/pricing.js'
@@ -70,6 +71,12 @@ test('backup and replace-restore round-trip the ledger', () => {
     service.backupTo(backupPath)
     assert.ok(existsSync(backupPath))
     service.dispose()
+
+    // Simulate a schema-v1 backup: restore must tolerate tables added later.
+    const legacy = new DatabaseSync(backupPath)
+    legacy.exec('DROP TABLE price_updates')
+    legacy.prepare("UPDATE meta SET value = '1' WHERE key = 'schema_version'").run()
+    legacy.close()
 
     // Restore into a fresh (empty) database file.
     const target = join(env.dir, 'restored.sqlite')

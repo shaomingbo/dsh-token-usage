@@ -40,7 +40,10 @@ function fakeCtx() {
     },
     sessionPersistence: {
       listSnapshots: async () => [{ header: session.header, revision: 'rev-1' }],
-      inspect: async () => ({ header: session.header, events: session.events }),
+      // The real contract: SessionInspection is { meta, events } — asserting
+      // the wrong key here once let every import fail with a SQLite bind
+      // error while the tests stayed green.
+      inspect: async () => ({ meta: session.header, events: session.events }),
     },
   }
   // Cordis only exposes declared services through ctx. Plugin row config is
@@ -108,14 +111,21 @@ test('apply imports history, serves the loopback channel, and folds live events'
     assert.equal(status.value.done, 1)
     assert.equal(status.value.running, false)
 
-    // Overview reflects the imported session.
+    // Overview and project attribution reflect the imported {meta, events}
+    // inspection contract.
     const overview = await channel.handler('overview', {})
     assert.equal(overview.ok, true)
     assert.equal(overview.value.totals.calls, 1)
     assert.equal(overview.value.totals.processingTokens, 150)
+    const projects = await channel.handler('rankings', { dimension: 'project', days: 365 })
+    assert.equal(projects.ok, true)
+    assert.equal(projects.value.rows[0].key, '/work/repo-a')
 
-    // Live event path folds into the same ledger.
-    const liveSession = { id: 'live', createdAt: T0 + 1000, cwd: '/work/repo-b', seedLength: undefined }
+    // Live event path folds creation metadata from session.header.
+    const liveSession = {
+      id: 'live',
+      header: { id: 'live', version: 0, createdAt: T0 + 1000, cwd: '/work/repo-b' },
+    }
     eventListeners.get('session/event')(liveSession, {
       type: 'assistant/message',
       seq: 2,
@@ -142,6 +152,37 @@ test('apply imports history, serves the loopback channel, and folds live events'
     const requests = await channel.handler('requests', {})
     assert.equal(requests.ok, true)
     assert.equal(requests.value.rows.length, 2)
+
+    // Price refresh is explicit: preview fetches and reports mappings, then
+    // apply persists that exact in-memory preview without another network call.
+    const originalFetch = globalThis.fetch
+    let fetches = 0
+    globalThis.fetch = async () => {
+      fetches += 1
+      return {
+        ok: true,
+        json: async () => ({
+          'deepseek/deepseek-chat': {
+            input_cost_per_token: 0.000001,
+            output_cost_per_token: 0.000002,
+          },
+        }),
+      }
+    }
+    try {
+      const preview = await channel.handler('price-refresh-preview', {})
+      assert.equal(preview.ok, true)
+      assert.equal(preview.value.fetched, 1)
+      assert.equal(preview.value.matchedObserved, 1)
+      const applied = await channel.handler('price-refresh-apply', {})
+      assert.equal(applied.ok, true)
+      assert.equal(applied.value.count, 1)
+      assert.equal(fetches, 1)
+      const catalog = await channel.handler('price-catalog', {})
+      assert.deepEqual(catalog.value.updated, ['deepseek/deepseek-chat'])
+    } finally {
+      globalThis.fetch = originalFetch
+    }
 
     // Unknown endpoints fail with a schema-legal envelope.
     const unknown = await channel.handler('bogus', {})
