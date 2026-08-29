@@ -29,8 +29,7 @@ function fakeCtx() {
   const channels = new Map()
   const intervals = []
   const session = syntheticSession('s1')
-  const ctx = {
-    config: {},
+  const rawCtx = {
     logger: { error() {}, warn() {}, info() {} },
     on: (event, listener) => { eventListeners.set(event, listener) },
     interval: (fn) => { intervals.push(fn) },
@@ -44,6 +43,14 @@ function fakeCtx() {
       inspect: async () => ({ header: session.header, events: session.events }),
     },
   }
+  // Cordis only exposes declared services through ctx. Plugin row config is
+  // passed separately as apply(ctx, config), so reading ctx.config must fail.
+  const ctx = new Proxy(rawCtx, {
+    get(target, property, receiver) {
+      if (property === 'config') throw new Error('cannot get property "config" without inject')
+      return Reflect.get(target, property, receiver)
+    },
+  })
   return { ctx, eventListeners, channels, intervals }
 }
 
@@ -55,6 +62,7 @@ test('module contract: name and host injections', () => {
   assert.equal(pluginName, 'dsh-token-usage')
   assert.ok(inject.includes('connection'))
   assert.ok(inject.includes('sessionPersistence'))
+  assert.ok(inject.includes('timer'))
 })
 
 test('data dir resolves inside the profile when installed conventionally', () => {
