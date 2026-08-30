@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const PACKAGE_NAME = 'dsh-token-usage'
-export const DEFAULT_SOURCE = 'github:shaomingbo/dsh-token-usage#v0.1.0'
+export const DEFAULT_SOURCE = 'github:shaomingbo/dsh-token-usage#v3.0.0'
 const COMMANDS = ['install', 'status', 'uninstall']
 
 export function parseArgs(argv) {

@@ -70,12 +70,21 @@ test('client carries both locale dictionaries', () => {
   assert.match(source, /const en = \{/)
 })
 
-test('client presents the confirmed four-space v2 workbench over unified query and inspect RPCs', () => {
-  for (const label of ['总览', '探索', '成本与预算', '数据与设置']) assert.ok(source.includes(label), `missing ${label}`)
-  for (const endpoint of ["'query'", "'inspect'", "'constrain'"]) assert.ok(source.includes(endpoint), `missing ${endpoint} RPC`)
+test('v3 client presents the objective pool dashboard over query and entry-summary RPCs', () => {
+  // Three-layer objective UI: entry micro indicator, dock panel, full dashboard.
+  for (const label of ['最紧一池', '按池堆叠', '按模型堆叠', '模型排行', '计费池', '未归属']) {
+    assert.ok(source.includes(label), `missing v3 label: ${label}`)
+  }
+  for (const endpoint of ["'query'", "'entry-summary'", "'plans'", "'save-plan'", "'save-plan-rules'"]) {
+    assert.ok(source.includes(endpoint), `missing ${endpoint} RPC`)
+  }
+  // Lens switch drives one query surface; refresh keeps the 15s cadence.
+  assert.match(source, /lensBy\(state\.lens\)/)
   assert.match(source, /15_000/)
-  assert.match(source, /state\.restored \? h\(Workbench/)
-  assert.ok(!source.includes('contain:strict'), 'virtual stream must retain a measurable height')
+  // The four-space workbench, inspector stacks, and saved views are gone.
+  assert.ok(!source.includes('成本与预算'), 'v2 cost space must be gone')
+  assert.ok(!source.includes('inspectorStack'), 'inspector stack must be gone')
+  assert.ok(!source.includes('savedViews'), 'saved views must be gone')
 })
 
 test('client uses host theme variables and never talks to the network directly', () => {
@@ -84,14 +93,15 @@ test('client uses host theme variables and never talks to the network directly',
   assert.ok(!/fetch\(/.test(source), 'client never fetches directly; it uses the loopback channel')
 })
 
-test('explore labels come from the query payload, not a hardcoded session map', () => {
-  assert.equal(source.includes('knownTitles'), false)
-  assert.equal(source.includes('extractDomSessionTitles'), false)
-  assert.match(source, /function formatSessionLabel/)
-  assert.match(source, /row\.sessionTitle/)
+test('sidebar entry renders the tightest-pool micro bars in pools mode', () => {
+  assert.match(source, /tu3-entry-b1/)
+  assert.match(source, /entry-summary/)
+  assert.match(source, /sidebarSummary/)
+  assert.match(source, /'pools'/)
 })
 
-test('overview top sessions rank by the selected metric, not recency', () => {
-  assert.match(source, /page: \{ entity: 'session', limit: 6, orderBy/)
-  assert.equal(source.includes("page: { entity: 'session', limit: 6 }"), false)
+test('pace notes are average-rate arithmetic, labelled as such', () => {
+  assert.match(source, /paceDisclaimer/)
+  assert.match(source, /ratePerDay/)
+  assert.match(source, /leftoverAtExpiryUsd/)
 })

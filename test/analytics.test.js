@@ -431,3 +431,109 @@ test('constrain narrows dimensions with OR within and AND across', () => {
     service.dispose()
   }
 })
+
+test('plans attribute requests to pools with objective cycle math and rates', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    // Two pools: a subscription for glm models and a credit balance for relays.
+    const openai = service.savePlan({ kind: 'sub', name: 'OpenAI Plus', priceUsd: 20, quotaUnit: 'newCompute', quotaValue: 1000, resetDay: 1 })
+    const relay = service.savePlan({ kind: 'credit', name: 'OpenRouter', balanceUsd: 21.3, expiryDay: '2026-10-15' })
+    service.savePlanRules(openai.id, [{ matchProvider: 'openai*', priority: 0 }])
+    service.savePlanRules(relay.id, [{ matchProvider: 'relay-*', priority: 0 }])
+
+    const now = Date.UTC(2026, 7, 30, 12)
+    service.importSession(session({ id: 'p1', cwd: '/w/a', time: now - 2 * DAY, provider: 'openai-codex', model: 'gpt-5.6', input: 300, output: 100 }))
+    service.importSession(session({ id: 'p2', cwd: '/w/a', time: now - 1 * DAY, provider: 'relay-grok', model: 'grok-4.6', input: 40, output: 10 }))
+    service.importSession(session({ id: 'p3', cwd: '/w/a', time: now - 1 * DAY, provider: 'deepseek', model: 'glm-5.3-flash', input: 500, output: 250 }))
+
+    const result = service.query({
+      filter: { timezone: 'UTC' },
+      views: ['pools', 'seriesBy'],
+      seriesBy: { groupBy: 'pool' },
+      now,
+    })
+    assert.equal(result.pools.configured, true)
+    const openaiPool = result.pools.pools.find((pool) => pool.id === openai.id)
+    const relayPool = result.pools.pools.find((pool) => pool.id === relay.id)
+    assert.equal(openaiPool.kind, 'sub')
+    assert.equal(openaiPool.kpis.newComputeTokens, 400)
+    assert.equal(openaiPool.usedPct, 40)
+    // Cycle started 2026-08-01; the two sample days fall inside the last 7 days.
+    assert.equal(openaiPool.ratePerDay > 0, true)
+    assert.equal(openaiPool.leftoverAtReset > 0, true)
+    assert.equal(relayPool.kind, 'credit')
+    assert.equal(relayPool.balanceUsd, 21.3)
+    assert.equal(relayPool.leftoverAtExpiryUsd > 0, true)
+    // glm traffic did not match any rule → unassigned bucket over the last 30 days.
+    assert.equal(result.pools.unassigned.newComputeTokens, 750)
+    assert.equal(result.pools.tightestPoolId, openai.id)
+
+    // seriesBy matrix: day keys with per-pool cells, plus the unassigned group.
+    const groups = result.seriesBy.groups.map((group) => group.id)
+    assert.equal(groups.includes(openai.id), true)
+    assert.equal(groups.includes('unassigned'), true)
+    const totalProcessing = result.seriesBy.days.reduce((sum, day) =>
+      sum + Object.values(day.groups).reduce((inner, cell) => inner + cell.processingTokens, 0), 0)
+    // p1 300+100+200 cache, p2 40+10+200, p3 500+250+200 — cache rides in processing.
+    assert.equal(totalProcessing, 600 + 250 + 950)
+
+    // Model stacking groups by model and rankings can sort by current cost.
+    const byModel = service.query({ filter: { timezone: 'UTC', time: { fromMs: now - 3 * DAY, toMs: now } }, views: ['seriesBy'], seriesBy: { groupBy: 'model' }, now })
+    assert.equal(byModel.seriesBy.groups.some((group) => group.id === 'glm-5.3-flash'), true)
+    const models = service.query({ filter: { timezone: 'UTC', time: { fromMs: now - 3 * DAY, toMs: now } }, views: ['rankings'], ranking: { dimension: 'model', by: 'currentUsdNano', limit: 10 }, now })
+    assert.equal(models.rankings.rows.length, 3)
+    assert.equal(typeof models.rankings.rows[0].cost.currentUsdNano, 'number')
+    assert.equal(typeof models.rankings.rows[0].poolId, 'string')
+    // Pool dimension ranking and pool filters narrow consistently.
+    const poolRank = service.query({ filter: { timezone: 'UTC', time: { fromMs: now - 3 * DAY, toMs: now } }, views: ['rankings'], ranking: { dimension: 'pool', by: 'newComputeTokens' }, now })
+    assert.equal(poolRank.rankings.rows.some((row) => row.key === 'unassigned'), true)
+    const narrowed = service.query({ filter: { timezone: 'UTC', time: { fromMs: now - 3 * DAY, toMs: now }, pool: [openai.id] }, views: ['kpis'], now })
+    assert.equal(narrowed.kpis.newComputeTokens, 400)
+
+    // Rule changes re-attribute on the next revision without touching history.
+    service.savePlanRules(openai.id, [{ matchProvider: 'openai*', priority: 0 }, { matchModel: 'grok*', priority: 1 }])
+    const after = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    const relayAfter = after.pools.pools.find((pool) => pool.id === relay.id)
+    // openai* still wins for relay-grok by priority 0, so relay keeps its request.
+    assert.equal(relayAfter.kpis.newComputeTokens, 50)
+
+    const summary = service.entrySummary({ now, timezone: 'UTC' })
+    assert.equal(summary.configured, true)
+    assert.equal(summary.tightest.id, openai.id)
+    assert.equal(typeof summary.month.daysLeft, 'number')
+  } finally {
+    service.dispose()
+  }
+})
+
+test('plans CRUD validates input and empty pools report unconfigured', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const empty = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now: T0 })
+    assert.equal(empty.pools.configured, false)
+    assert.equal(service.entrySummary({ now: T0, timezone: 'UTC' }).configured, false)
+
+    assert.throws(() => service.savePlan({ kind: 'team', name: 'x' }), /invalid plan kind/)
+    assert.throws(() => service.savePlan({ kind: 'sub', name: '', quotaValue: 10 }), /plan name is required/)
+    assert.throws(() => service.savePlan({ kind: 'sub', name: 'x', quotaValue: -1 }), /quotaValue must be positive/)
+    assert.throws(() => service.savePlan({ kind: 'sub', name: 'x', quotaValue: 10, resetDay: 31 }), /resetDay/)
+
+    const plan = service.savePlan({ kind: 'sub', name: 'DeepSeek Pro', priceUsd: 20, quotaValue: 60e6 })
+    assert.throws(() => service.savePlanRules(plan.id, [{}]), /matchProvider or matchModel is required/)
+    assert.throws(() => service.savePlanRules('plan:missing', [{ matchModel: 'x' }]), /plan not found/)
+    service.savePlanRules(plan.id, [{ matchModel: 'glm-*', priority: 0 }])
+    const listed = service.listPlans()
+    assert.equal(listed.length, 1)
+    assert.equal(listed[0].rules.length, 1)
+    assert.equal(listed[0].quotaValue, 60e6)
+
+    service.archivePlan(plan.id)
+    assert.equal(service.listPlans()[0].archived, true)
+    const afterArchive = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now: T0 })
+    assert.equal(afterArchive.pools.configured, false)
+    service.archivePlan(plan.id, { archived: false })
+    assert.equal(service.listPlans()[0].archived, false)
+  } finally {
+    service.dispose()
+  }
+})

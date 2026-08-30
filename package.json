@@ -1,7 +1,7 @@
 {
   "name": "dsh-token-usage",
-  "version": "0.1.0",
-  "description": "Local token usage and cost ledger for DeepSeek Harness: historical import, live capture, project/model/provider analytics, and a profile-style dashboard. No telemetry, no prompts stored.",
+  "version": "3.0.0",
+  "description": "Local token usage ledger for DeepSeek Harness: billing-pool dashboard, dock panel, and sidebar micro indicator. No telemetry, no prompts stored.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

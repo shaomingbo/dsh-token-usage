@@ -5,7 +5,7 @@ Local token usage and cost analytics for [DeepSeek Harness](https://github.com/s
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v0.1.0
+npx --yes github:shaomingbo/dsh-token-usage#v3.0.0
 ```
 
 That single command installs the bundle into the `web` profile. Then **restart DSH manually and hard-refresh the Web GUI** — the installer never restarts or touches the running DSH process.
@@ -13,14 +13,14 @@ That single command installs the bundle into the `web` profile. Then **restart D
 Other commands:
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v0.1.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v0.1.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v0.1.0 --profile web --source github:shaomingbo/dsh-token-usage#v0.1.0
-npx --yes github:shaomingbo/dsh-token-usage#v0.1.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 status
+npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v0.1.0
+npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --help
 ```
 
 - `--profile <name>` — target DSH profile (default `web`)
-- `--source <source>` — package source; the default is pinned to the `v0.1.0` tag (never a floating branch)
+- `--source <source>` — package source; the default is pinned to the `v3.0.0` tag (never a floating branch)
 - `DSH_TOKEN_USAGE_SOURCE` — environment-variable override for the source
 
 ### Local development
@@ -28,7 +28,7 @@ npx --yes github:shaomingbo/dsh-token-usage#v0.1.0 --help
 ```sh
 dsh-token-usage --source link:/absolute/path/to/dsh-token-usage
 # or
-npx --yes github:shaomingbo/dsh-token-usage#v0.1.0 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --source link:$PWD
 ```
 
 ### Manual fallback
@@ -37,9 +37,9 @@ The installer only ever edits two slots in `profiles/<name>/package.json` — `d
 
 ## What you get
 
-- **Four-space analytics workbench** — Overview, Explore, Cost & Budget, and Data & Settings share one global scope. Click trend buckets and ranked dimensions to narrow; inspect projects/models/providers → sessions → requests in a stacked drawer without losing context. Follows the Harness theme, keyboard navigation, responsive layouts, and both locales.
-- **Unified analytics** — 30-day reported-only default, previous equal-period comparison, processing/new-compute/current-rule cost/request metrics, bounded stacked trends, composition, ranked dimensions, 12-month activity, weekday/hour rhythm, neutral session labels, and at most three deterministic evidence-backed findings.
-- **Local controls** — Git/manual project identities can be merged, split, renamed, colored, or hidden; request corrections/exclusions are append-only and undoable; natural-month budgets support profile/project/provider/model scopes and USD/processing/new-compute units with conservative forecast gates.
+- **Three-layer objective UI** — a sidebar micro indicator (tightest billing pool + month progress), a right-docked compact panel, and a full-frame dashboard. Switch equivalent-USD / new-compute tokens / requests without changing the data; stack the 30-day activity chart by pool or by model; rank models across pools. No coaching copy — only numbers and labeled average-rate arithmetic.
+- **Billing pools** — you configure subscriptions (quota, reset day, monthly price) and prepaid/relay balances (balance, expiry). Attribution rules match provider/model globs; unmatched traffic lands in an Unassigned bucket. Rules never rewrite request history.
+- **Data & settings corner** — pool/rule editor, pricing aliases/overrides/LiteLLM refresh, import/export/backup/purge, and display settings. The v2 four-space workbench, inspector stacks, budgets UI, and saved views are gone (ledger tables remain).
 - **Automatic history import** — sessions from before installation are imported read-only in the background (pausable, cancelable, resumable). Missed live events are reconciled from the durable log.
 - **Correct counting** — one observable model call per session/turn/step; repeated usage samples replace instead of adding; fork-inherited seed prefixes are never double-counted; subagent usage counts once in its own session and rolls up through lineage; compaction never bills; reasoning tokens stay a labeled subset of output.
 - **Honest cost** — estimates use an embedded versioned snapshot plus an optional, explicit LiteLLM refresh. Preview the source and observed-model matches before applying; no background fetch occurs. Provider-compatible unique matches apply automatically, while cross-provider candidates require an explicit alias chosen from observed/catalog dropdowns. Custom prices and provider multipliers remain available. Original valuations are immutable; current-rule revaluation changes immediately. Unknown prices are excluded and reported as coverage, never guessed.
@@ -60,7 +60,7 @@ No telemetry. No network requests by default. Prompts, responses, tool arguments
 - Usage is a Harness-observed account, not an upstream invoice: provider-internal retries that never reached the session log are not observable and not guessed.
 - The estimation seam is implemented and tested at the ledger level, but v0.1 does not yet attach the Harness token meter on the host side, so usage-less steps stay "unknown" rather than estimated.
 - Verified against DSH 0.1.1-rc.2 with capability checks at startup; unsupported runtimes get a clear diagnostic instead of silent miscounting.
-- Alert automation, bill/quota reconciliation, agent-skill-tool attribution, cross-profile aggregation, cloud sync, and automatic exchange rates remain out of scope. See [V2-PLAN.md](V2-PLAN.md).
+- Alert automation, bill/quota reconciliation, agent-skill-tool attribution, cross-profile aggregation, cloud sync, and automatic exchange rates remain out of scope. The v2 workbench plan is in [V2-PLAN.md](V2-PLAN.md).
 
 ## Development
 
