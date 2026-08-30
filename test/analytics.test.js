@@ -537,3 +537,22 @@ test('plans CRUD validates input and empty pools report unconfigured', () => {
     service.dispose()
   }
 })
+
+test('rolling 5-hour windows ignore usage older than five hours', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const plan = service.savePlan({ kind: 'sub', name: 'Codex', quotaValue: 1000, windowKind: '5h' })
+    service.savePlanRules(plan.id, [{ matchProvider: 'openai*', priority: 0 }])
+    const now = Date.UTC(2026, 7, 30, 12)
+    service.importSession(session({ id: 'old', cwd: '/w/a', time: now - 6 * 3_600_000, provider: 'openai-codex', model: 'gpt', input: 800, output: 0, cache: 0 }))
+    service.importSession(session({ id: 'fresh', cwd: '/w/a', time: now - 1 * 3_600_000, provider: 'openai-codex', model: 'gpt', input: 100, output: 0, cache: 0 }))
+    const result = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    const pool = result.pools.pools[0]
+    assert.equal(pool.windowKind, '5h')
+    assert.equal(pool.kpis.newComputeTokens, 100)
+    assert.equal(pool.usedPct, 10)
+    assert.equal(pool.leftoverAtReset, null)
+  } finally {
+    service.dispose()
+  }
+})
