@@ -1,4 +1,12 @@
-# DSH Accounts & Usage 4.1.0 Specification
+# DSH Accounts & Usage 5.0.0 Specification
+
+## 5.0 Account Lifecycle Amendment
+
+Version 5 makes the account the single unit of the whole interaction. Schema v7 is additive (`account_products.color`, `account_products.connection_id`) and pool attribution now reads `account_attribution_rules`; the v5 lossless projection keeps legacy `plans`/`plan_rules` working and stays authoritative for their projected copies after any legacy write.
+
+Zero-config accounts: every configured connection becomes one `account_products` row (`source_kind='connection'`) with default provider-alias rules at priority 100; archived auto accounts are never resurrected, and only the active Antigravity account routes local traffic. A host-side product-template catalog (`lib/accounts/templates.json`, versioned, seeded into `provider_templates`/`provider_mappings`) pre-fills windows, officially published exact values and provider aliases; the wizard joins observed ledger traffic into suggestions, and an advanced form covers custom quotas, prices, balances and rules.
+
+The UI journey is entry → dock → overview → per-account insight. Meters are official-first: provider windows render as percent bars with reset countdowns, source badges and observed-at timestamps; local quota percentages appear only for ledger-computable units (tokens/USD/requests with exact or manual values), credits and percent limits stay official-observed only, and the tightest constraint across both worlds drives the sidebar dual bars. Each account insight separates official allowance, DSH-observed local usage (with arithmetic-only extrapolation), billing, attribution and connection management. The v5 billing-pool form is retired from the UI; the `save-plan` RPC family remains available but reports `deprecated`. Observation refresh stays explicit on the RPC surface, with a silent throttle (at most one background refresh per 15 minutes) piggy-backing on `entry-summary` polls.
 
 ## 4.0 Product Amendment
 

@@ -1,20 +1,20 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 4.2.0 keeps the package name and existing local ledger while adding one place to connect provider accounts and compare provider observations with DSH-observed usage. No telemetry, prompt storage, or DSH source patches.
+`dsh-token-usage` 5.0.0 keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches.
 
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --profile web --source github:shaomingbo/dsh-token-usage#v4.2.0
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 --help
 ```
 
 `--profile` defaults to `web`. `--source` defaults to the fixed `v4.2.0` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
@@ -22,10 +22,20 @@ npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --help
 ### Local development
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 --source link:$PWD
 ```
 
 The installer atomically changes only `dependencies["dsh-token-usage"]` and `dsh.profile.bundles`, runs `pnpm install --ignore-scripts` (with the documented corepack fallback), and restores the manifest if installation fails. Manual editing of those same two fields is a fallback, not the preferred installation path.
+
+## Account lifecycle (v5)
+
+The interaction is one journey: sidebar entry → dock → overview → per-account insight.
+
+- **Zero-config accounts:** every configured connection (ChatGPT/Codex, Grok, each Antigravity account, GLM, Ollama Local/Cloud) becomes an `account_products` row with default attribution rules the moment it appears. Archived accounts are never resurrected.
+- **Official-first meters:** CodexBar-style percent bars per window (primary 5h, weekly, daily, term) with reset countdowns, source badges (`official API`, `official page (brittle)`, `local ledger`, `user estimate`) and observed-at timestamps. The ledger never converts official percentages into token guesses; credits/percent limits stay official-observed only.
+- **Simple configuration:** a host-side product-template catalog (`lib/accounts/templates.json`, seeded into `provider_templates`) pre-fills windows, exact values (GLM plan credits, Aliyun request caps, Gemini daily requests) and provider aliases. The wizard suggests accounts from observed ledger traffic; an advanced form still covers custom quotas, prices, balances and rules.
+- **Honest local half:** each account's DSH-observed usage (equivalent $, new-compute tokens, requests, model table, 30-day trend) with average-rate extrapolation explicitly labeled as arithmetic, never as a forecast.
+- **Deprecated:** the v5 billing-pool form is retired from the UI. `plans`/`plan_rules` remain readable and keep working through the lossless projection; `save-plan` RPCs stay available but report `deprecated`.
 
 ## Product model
 
@@ -53,7 +63,7 @@ The existing path is unchanged:
 
 `<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/`
 
-Linked development still falls back to `<DSH_HOME>/dsh-token-usage/`. Schema v6 is additive: legacy ledger, `plans`, and `plan_rules` tables remain; v5 plans and both quota windows are projected losslessly as manual estimates. Existing files are backed up before transactional migration. Newer schemas refuse normal writes and have a separate read-only diagnostic seam.
+Linked development still falls back to `<DSH_HOME>/dsh-token-usage/`. Schema v7 is additive: legacy ledger, `plans`, and `plan_rules` tables remain; v5 plans and both quota windows are projected losslessly as manual estimates that stay authoritative for their projected copies, and account products gain `color`/`connection_id` columns. Pool attribution now reads `account_attribution_rules` (seeded by the projection for legacy plans). Existing files are backed up before transactional migration. Newer schemas refuse normal writes and have a separate read-only diagnostic seam.
 
 ## Development
 

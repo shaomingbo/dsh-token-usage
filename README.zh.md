@@ -1,20 +1,20 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 4.2.0 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
+`dsh-token-usage` 5.0.0 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
 
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --profile web --source github:shaomingbo/dsh-token-usage#v4.2.0
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 --help
 ```
 
 `--profile` 默认是 `web`；`--source` 默认固定到 `v4.2.0` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
@@ -22,10 +22,20 @@ npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --help
 ### 本地开发
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.2.0 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.0 --source link:$PWD
 ```
 
 安装器只原子修改 `dependencies["dsh-token-usage"]` 和 `dsh.profile.bundles`，执行 `pnpm install --ignore-scripts`（含 corepack 回退），失败时恢复 manifest。手工修改同样两个字段仅作为兜底。
+
+## 账户生命周期（v5）
+
+整个交互是一条动线：侧栏入口 → dock → 总览 → 每账户洞察。
+
+- **零配置账户：** 每个已配置连接（ChatGPT/Codex、Grok、每个 Antigravity 账号、GLM、Ollama Local/Cloud）出现时即自动成为一条 `account_products` 记录并带默认归因规则；已归档的自动账户不会被重建。
+- **官方优先的表盘：** CodexBar 式的窗口百分比条（主窗口 5h、周窗口、每日、订阅期）带重置倒计时、来源徽标（官方接口 / 官方页面（脆弱）/ 本地账本 / 用户估计）与观察时间。本地账本绝不把官方百分比换算成 token 猜测；积分/百分比额度只来自官方观察。
+- **简单配置：** host 侧产品模板目录（`lib/accounts/templates.json`，启动时 seed 进 `provider_templates`）预填窗口、精确值（GLM 套餐积分、阿里云请求上限、Gemini 每日请求数）和 provider 别名；向导根据账本实测流量给建账户建议；高级表单仍支持自定义额度、价格、余额与规则。
+- **诚实的本地半边：** 每个账户的 DSH 观察用量（等值 $、新计算 token、请求数、模型表、30 天趋势），外推明确标注为算术平均速率而非预测。
+- **弃用：** v5 计费池表单从 UI 退役。`plans`/`plan_rules` 仍可读并经无损投影继续生效；`save-plan` RPC 保留但返回 `deprecated`。
 
 ## 产品模型
 

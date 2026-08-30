@@ -35,3 +35,7 @@ _Avoid_: Provider usage, bill
 **Attribution Rule**:
 A user-controlled rule that maps locally observed provider/model usage to a connection or product without rewriting the underlying ledger facts. Rules affect derived views and can be changed without altering history.
 _Avoid_: Ownership, request stamp
+
+**Product Template**:
+A versioned, host-side catalog entry describing a provider offering's structure — windows, officially published exact values, tiers, and provider aliases — used to pre-fill account creation. Templates carry structure, never secrets, and their numbers come from dated research rather than being hardcoded in the client.
+_Avoid_: Hardcoded plan, client-side defaults
