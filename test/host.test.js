@@ -4,7 +4,16 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { apply, resolveDataDir, detectGitProject, name as pluginName, inject } from '../lib/index.js'
+import {
+  ACCOUNT_USAGE_PROTOCOL,
+  ACCOUNT_USAGE_SERVICE,
+  apply,
+  resolveDataDir,
+  detectGitProject,
+  secretSafeLogger,
+  name as pluginName,
+  inject,
+} from '../lib/index.js'
 
 const T0 = Date.UTC(2026, 6, 10, 8, 0, 0)
 
@@ -28,11 +37,25 @@ function fakeCtx() {
   const eventListeners = new Map()
   const channels = new Map()
   const intervals = []
+  const provided = new Map()
   const session = syntheticSession('s1')
   const rawCtx = {
     logger: { error() {}, warn() {}, info() {} },
     on: (event, listener) => { eventListeners.set(event, listener) },
     interval: (fn) => { intervals.push(fn) },
+    provide: (id, value) => { provided.set(id, value) },
+    credentials: {
+      describe: async () => ({ configured: false }),
+      resolve: async () => undefined,
+      set: async () => {},
+    },
+    settings: {
+      value: {},
+      get(key) { return this.value[key] },
+      async update(key, patch) {
+        this.value[key] = { ...(this.value[key] ?? {}), ...patch, providers: { ...(this.value[key]?.providers ?? {}), ...(patch.providers ?? {}) } }
+      },
+    },
     connection: {
       rpc: {
         handle: (channel, handler, options) => { channels.set(channel, { handler, options }) },
@@ -54,7 +77,7 @@ function fakeCtx() {
       return Reflect.get(target, property, receiver)
     },
   })
-  return { ctx, eventListeners, channels, intervals }
+  return { ctx, eventListeners, channels, intervals, provided }
 }
 
 async function settle(ms = 60) {
@@ -64,8 +87,19 @@ async function settle(ms = 60) {
 test('module contract: name and host injections', () => {
   assert.equal(pluginName, 'dsh-token-usage')
   assert.ok(inject.includes('connection'))
+  assert.ok(inject.includes('credentials'))
   assert.ok(inject.includes('sessionPersistence'))
+  assert.ok(inject.includes('settings'))
   assert.ok(inject.includes('timer'))
+})
+
+test('provider capability logs redact common credential forms', () => {
+  const lines = []
+  const logger = secretSafeLogger({ info: (...args) => lines.push(args.join(' ')), warn: (...args) => lines.push(args.join(' ')), error: (...args) => lines.push(args.join(' ')) })
+  logger.warn('failed Authorization: Bearer %s api_key=%s', 'eyJabcdefghijk.abcdefghijkl', 'sk-secretvalue')
+  const output = lines.join('\n')
+  assert.doesNotMatch(output, /eyJabcdefghijk|sk-secretvalue/)
+  assert.match(output, /REDACTED/)
 })
 
 test('data dir resolves inside the profile when installed conventionally', () => {
@@ -122,14 +156,31 @@ test('apply imports history, serves the loopback channel, and folds live events'
   process.env.DSH_HOME = tempHome().home
   const { cleanup } = { cleanup: () => rmSync(process.env.DSH_HOME, { recursive: true, force: true }) }
   try {
-    const { ctx, eventListeners, channels } = fakeCtx()
-    apply(ctx)
+    const { ctx, eventListeners, channels, provided } = fakeCtx()
+    apply(ctx, { providerProxy: false })
     await settle()
 
     // The channel is loopback-only.
     const channel = channels.get('/token-usage')
     assert.ok(channel, 'token-usage channel missing')
     assert.equal(channel.options.authority, 'loopback')
+    assert.equal(channels.has('/subscription-search'), false, 'SearchChain retains exclusive ownership')
+    assert.equal(channels.get('/subscription-antigravity')?.options.authority, 'loopback')
+    const accountChannel = channels.get('/account-usage')
+    assert.equal(accountChannel?.options.authority, 'loopback')
+    const accountUsage = provided.get(ACCOUNT_USAGE_SERVICE)
+    assert.equal(accountUsage?.protocol, ACCOUNT_USAGE_PROTOCOL)
+    assert.equal((await accountUsage.list()).privacy.secretsInRpc, false)
+    const accountSummary = await accountChannel.handler('summary', {})
+    assert.equal(accountSummary.ok, true)
+    assert.equal(accountSummary.value.product.name, 'DSH Accounts & Usage')
+    assert.equal(accountSummary.value.privacy.secretsInRpc, false)
+    assert.ok(accountSummary.value.connections.some(connection => connection.providerId === 'ollama-local' && connection.quotaApplicable === false))
+    assert.equal((await accountChannel.handler('refresh-observations', {})).error.code, 'explicit-refresh-required')
+    const localObservation = await accountChannel.handler('observe-provider', { providerId: 'ollama-local', refresh: true })
+    assert.equal(localObservation.value.observation.quotaApplicable, false)
+    const storedObservations = await accountChannel.handler('observations', {})
+    assert.equal(storedObservations.value.observations[0].providerId, 'ollama-local')
 
     // Historical import completed in the background.
     const status = await channel.handler('import-status', {})

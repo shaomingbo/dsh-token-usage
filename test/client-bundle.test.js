@@ -70,7 +70,19 @@ test('client carries both locale dictionaries', () => {
   assert.match(source, /const en = \{/)
 })
 
-test('v3 client presents the objective pool dashboard over query and entry-summary RPCs', () => {
+test('v4 client separates provider connections and official observations from the local ledger', () => {
+  for (const label of ['DSH Accounts & Usage', 'Provider connections', 'Official observations', 'Local usage ledger', '提供方连接', '本地用量账本']) {
+    assert.ok(source.includes(label), `missing Accounts & Usage label: ${label}`)
+  }
+  assert.ok(source.includes("'/account-usage'"))
+  assert.ok(source.includes("'refresh-observations'"))
+  assert.ok(source.includes("refresh: true"))
+  assert.ok(source.includes("OLLAMA_SESSION_COOKIE"))
+  assert.ok(source.includes("cookieOptIn"))
+  assert.ok(source.includes("connection-action"))
+})
+
+test('v3 ledger dashboard remains available over query and entry-summary RPCs', () => {
   // Three-layer objective UI: entry micro indicator, dock panel, full dashboard.
   for (const label of ['最紧一池', '按池堆叠', '按模型堆叠', '模型排行', '计费池', '未归属']) {
     assert.ok(source.includes(label), `missing v3 label: ${label}`)

@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const PACKAGE_NAME = 'dsh-token-usage'
-export const DEFAULT_SOURCE = 'github:shaomingbo/dsh-token-usage#v3.0.0'
+export const DEFAULT_SOURCE = 'github:shaomingbo/dsh-token-usage#v4.0.0'
 const COMMANDS = ['install', 'status', 'uninstall']
 
 export function parseArgs(argv) {
@@ -76,13 +76,13 @@ export function describeStatus(manifest) {
   return { installed: Boolean(source) && bundled, source, bundled }
 }
 
-function runPnpmInstall(profileDir) {
+export function runPnpmInstall(profileDir, { spawn = spawnSync } = {}) {
   const attempts = [
     ['pnpm', ['install', '--ignore-scripts']],
     ['corepack', ['pnpm', 'install', '--ignore-scripts']],
   ]
   for (const [command, args] of attempts) {
-    const result = spawnSync(command, args, { cwd: profileDir, stdio: 'inherit' })
+    const result = spawn(command, args, { cwd: profileDir, stdio: 'inherit' })
     if (!result.error && result.status === 0) return
     if (result.error?.code !== 'ENOENT') {
       throw new Error(`${command} ${args.join(' ')} failed with exit code ${result.status}`)
@@ -106,9 +106,9 @@ function printHelp() {
   console.log(`Usage: ${PACKAGE_NAME} [command] [--profile web] [--source ${DEFAULT_SOURCE}]
 
 Commands:
-  install     Add the token usage bundle to the profile (default)
-  status      Show whether the token usage bundle is installed
-  uninstall   Remove the token usage bundle from the profile (idempotent)
+  install     Add DSH Accounts & Usage to the profile (default)
+  status      Show whether DSH Accounts & Usage is installed
+  uninstall   Remove DSH Accounts & Usage from the profile (idempotent)
 
 Options:
   --profile <name>   Target DSH profile (default: web)
@@ -161,7 +161,7 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
       throw error
     }
     console.log(`\nRemoved ${PACKAGE_NAME} from ${profileDir}`)
-    console.log(`Usage data is kept in the profile data directory; delete it there if you want a full wipe.`)
+    console.log(`Accounts & Usage data is kept in the profile data directory; delete it there if you want a full wipe.`)
     console.log('Restart DSH and hard-refresh the Web page to unload the bundle.')
     return
   }
@@ -177,7 +177,7 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   }
 
   console.log(`\nInstalled ${PACKAGE_NAME} into ${profileDir}`)
-  console.log('Restart DSH and hard-refresh the Web page so the usage bundle enters the boot graph.')
+  console.log('Restart DSH and hard-refresh the Web page so DSH Accounts & Usage enters the boot graph.')
 }
 
 async function main() {

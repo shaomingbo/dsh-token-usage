@@ -1,7 +1,7 @@
-# DSH host bundle: a local token usage and cost ledger. The plugin imports
-# durable session history through read-only persistence APIs, folds live
-# session events, and serves analytics to its client half over a loopback RPC
-# channel. It never patches existing rows and never touches the conversation UI.
+# DSH Accounts & Usage: unified provider-account capabilities and official
+# allowance observations beside the existing profile-private usage ledger.
+# Every client surface is loopback-only; secrets stay in owner-only stores or
+# DSH credentials and never enter SQLite, RPC responses, logs, or exports.
 
 - insert:
     - id: dsh-token-usage

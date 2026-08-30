@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { run, parseArgs, applyManifest, removeManifest, describeStatus, PACKAGE_NAME } from '../bin/install.js'
+import { run, runPnpmInstall, parseArgs, applyManifest, removeManifest, describeStatus, PACKAGE_NAME } from '../bin/install.js'
 
 function tempHome() {
   const home = mkdtempSync(join(tmpdir(), 'dsh-token-usage-home-'))
@@ -28,11 +28,32 @@ test('parseArgs defaults to install on the web profile with the pinned source', 
   const options = parseArgs([])
   assert.equal(options.command, 'install')
   assert.equal(options.profile, 'web')
-  assert.equal(options.source, `github:shaomingbo/${PACKAGE_NAME}#v3.0.0`)
+  assert.equal(options.source, `github:shaomingbo/${PACKAGE_NAME}#v4.0.0`)
   assert.throws(() => parseArgs(['--profile']), /require values/)
   assert.throws(() => parseArgs(['bogus']), /unknown argument/)
   assert.equal(parseArgs(['uninstall']).command, 'uninstall')
   assert.equal(parseArgs(['--help']).help, true)
+})
+
+test('environment source override is honored without changing the pinned default', () => {
+  const previous = process.env.DSH_TOKEN_USAGE_SOURCE
+  process.env.DSH_TOKEN_USAGE_SOURCE = 'link:/tmp/accounts-usage'
+  try { assert.equal(parseArgs([]).source, 'link:/tmp/accounts-usage') }
+  finally {
+    if (previous === undefined) delete process.env.DSH_TOKEN_USAGE_SOURCE
+    else process.env.DSH_TOKEN_USAGE_SOURCE = previous
+  }
+})
+
+test('dependency installation falls back from pnpm to corepack and reports dual failure', () => {
+  const calls = []
+  runPnpmInstall('/tmp/profile', { spawn(command, args) {
+    calls.push([command, args])
+    return command === 'pnpm' ? { error: { code: 'ENOENT' } } : { status: 0 }
+  } })
+  assert.deepEqual(calls.map(([command]) => command), ['pnpm', 'corepack'])
+  assert.deepEqual(calls[1][1], ['pnpm', 'install', '--ignore-scripts'])
+  assert.throws(() => runPnpmInstall('/tmp/profile', { spawn() { return { error: { code: 'ENOENT' } } } }), /pnpm is unavailable/)
 })
 
 test('applyManifest/removeManifest/describeStatus edit only the two allowed slots', () => {

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { openDatabase, SCHEMA_VERSION, LedgerError } from '../lib/ledger/db.js'
+import { openDatabase, openDatabaseReadOnly, SCHEMA_VERSION, LedgerError } from '../lib/ledger/db.js'
 import { createLedgerService } from '../lib/ledger/service.js'
+import { AccountsStore } from '../lib/accounts/storage.js'
 
 function tempDir() {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-token-usage-mig-'))
@@ -67,6 +68,85 @@ test('re-running migrations on an existing file creates a pre-migration backup',
     assert.ok(existsSync(`${dbPath}.pre-migration`), 'expected a pre-migration backup copy')
   } finally {
     env.cleanup()
+  }
+})
+
+test('v6 adds account-domain tables without removing legacy tables', () => {
+  const db = openDatabase(':memory:')
+  try {
+    const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name))
+    for (const name of [
+      'plans', 'plan_rules', 'account_connections', 'credential_metadata',
+      'account_products', 'account_billing', 'account_limits', 'account_observations',
+      'provider_templates', 'provider_mappings', 'account_attribution_rules',
+    ]) assert.ok(tables.has(name), `missing ${name}`)
+    const secretColumns = db.prepare("PRAGMA table_info('credential_metadata')").all().map((row) => row.name)
+    assert.equal(secretColumns.some((name) => /token|secret|cookie|authorization|value/i.test(name)), false)
+  } finally {
+    db.close()
+  }
+})
+
+test('v5 plans and both windows migrate losslessly as manual estimates', () => {
+  const env = tempDir()
+  try {
+    const dbPath = join(env.dir, 'usage.sqlite')
+    const db = openDatabase(dbPath)
+    db.prepare(`INSERT INTO plans
+      (id, kind, name, quota_unit, quota_value, reset_day, created_at, window_kind,
+       window2_kind, window2_quota_value, window2_quota_unit)
+      VALUES ('p1', 'sub', 'Fixture', 'newCompute', '1000', 7, 1, '5h', '7d', '5000', 'newCompute')`).run()
+    db.prepare("UPDATE meta SET value = '5' WHERE key = 'schema_version'").run()
+    db.close()
+    const migrated = openDatabase(dbPath)
+    const product = migrated.prepare("SELECT * FROM account_products WHERE id = 'legacy-plan:p1'").get()
+    assert.equal(product.name, 'Fixture')
+    const limits = migrated.prepare("SELECT * FROM account_limits WHERE product_id = 'legacy-plan:p1' ORDER BY external_key").all()
+    assert.equal(limits.length, 2)
+    assert.deepEqual(limits.map((row) => [row.external_key, row.value_mode, row.exact_value, row.window_kind, row.window_seconds]), [
+      ['primary', 'manual', '1000', 'rolling', 18000],
+      ['secondary', 'manual', '5000', 'rolling', 604800],
+    ])
+    assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM plans WHERE id = 'p1'").get().count, 1)
+    const billing = new AccountsStore(migrated).get('billing', 'legacy-billing:p1')
+    assert.equal(billing.connectionId, null)
+    assert.equal(billing.model, 'subscription')
+    migrated.close()
+  } finally {
+    env.cleanup()
+  }
+})
+
+test('newer databases can be inspected only through the explicit read-only seam', () => {
+  const env = tempDir()
+  try {
+    const dbPath = join(env.dir, 'usage.sqlite')
+    const db = openDatabase(dbPath)
+    db.prepare("UPDATE meta SET value = '99' WHERE key = 'schema_version'").run()
+    db.close()
+    const diagnostic = openDatabaseReadOnly(dbPath)
+    assert.equal(diagnostic.schemaVersion, 99)
+    assert.equal(diagnostic.readOnly, true)
+    assert.throws(() => diagnostic.db.prepare("UPDATE meta SET value = '1' WHERE key = 'schema_version'").run())
+    diagnostic.db.close()
+  } finally {
+    env.cleanup()
+  }
+})
+
+test('provider observations persist separately from the local ledger and reject secrets', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const observation = {
+      id: 'ollama-local:fixture:1', recordType: 'observation', providerId: 'ollama-local', connectionId: 'fixture',
+      observedAt: 1, source: 'local_ledger', brittle: false, complete: true, quotaApplicable: false,
+      product: null, billing: null, windows: [], limits: [], warnings: [], metadata: null,
+    }
+    service.saveAccountObservation(observation)
+    assert.deepEqual(service.listAccountObservations(), [observation])
+    assert.throws(() => service.saveAccountObservation({ ...observation, id: 'bad', apiKey: 'secret' }), error => error.code === 'secret-rejected')
+  } finally {
+    service.dispose()
   }
 })
 

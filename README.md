@@ -1,77 +1,69 @@
-# dsh-token-usage
+# DSH Accounts & Usage
 
-Local token usage and cost analytics for [DeepSeek Harness](https://github.com/shaomingbo/deepseek-harness): a profile-style dashboard for what your harness processed — tokens, requests, projects, sessions, models, providers, and estimated cost. No telemetry. No prompts stored. No DSH patches.
+`dsh-token-usage` 4.0.0 keeps the package name and existing local ledger while adding one place to connect provider accounts and compare provider observations with DSH-observed usage. No telemetry, prompt storage, or DSH source patches.
 
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0
 ```
 
-That single command installs the bundle into the `web` profile. Then **restart DSH manually and hard-refresh the Web GUI** — the installer never restarts or touches the running DSH process.
-
-Other commands:
+This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v0.1.0
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 status
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v4.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --help
 ```
 
-- `--profile <name>` — target DSH profile (default `web`)
-- `--source <source>` — package source; the default is pinned to the `v3.0.0` tag (never a floating branch)
-- `DSH_TOKEN_USAGE_SOURCE` — environment-variable override for the source
+`--profile` defaults to `web`. `--source` defaults to the fixed `v4.0.0` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
 
 ### Local development
 
 ```sh
-dsh-token-usage --source link:/absolute/path/to/dsh-token-usage
-# or
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --source link:$PWD
 ```
 
-### Manual fallback
+The installer atomically changes only `dependencies["dsh-token-usage"]` and `dsh.profile.bundles`, runs `pnpm install --ignore-scripts` (with the documented corepack fallback), and restores the manifest if installation fails. Manual editing of those same two fields is a fallback, not the preferred installation path.
 
-The installer only ever edits two slots in `profiles/<name>/package.json` — `dependencies["dsh-token-usage"]` and `dsh.profile.bundles` — then runs `pnpm install --ignore-scripts` in the profile. You can make the same two edits by hand if you prefer; writes are atomic and rolled back if dependency installation fails.
+## Product model
 
-## What you get
+See [`CONTEXT.md`](CONTEXT.md) for the canonical language: Connection, Credential, Product, Billing, Limit, Observation, Usage Ledger, and Attribution Rule.
 
-- **Three-layer objective UI** — a sidebar micro indicator (tightest billing pool + month progress), a right-docked compact panel, and a full-frame dashboard. Switch equivalent-USD / new-compute tokens / requests without changing the data; stack the 30-day activity chart by pool or by model; rank models across pools. No coaching copy — only numbers and labeled average-rate arithmetic.
-- **Billing pools** — you configure subscriptions (quota, reset day, monthly price) and prepaid/relay balances (balance, expiry). Attribution rules match provider/model globs; unmatched traffic lands in an Unassigned bucket. Rules never rewrite request history.
-- **Data & settings corner** — pool/rule editor, pricing aliases/overrides/LiteLLM refresh, import/export/backup/purge, and display settings. The v2 four-space workbench, inspector stacks, budgets UI, and saved views are gone (ledger tables remain).
-- **Automatic history import** — sessions from before installation are imported read-only in the background (pausable, cancelable, resumable). Missed live events are reconciled from the durable log.
-- **Correct counting** — one observable model call per session/turn/step; repeated usage samples replace instead of adding; fork-inherited seed prefixes are never double-counted; subagent usage counts once in its own session and rolls up through lineage; compaction never bills; reasoning tokens stay a labeled subset of output.
-- **Honest cost** — estimates use an embedded versioned snapshot plus an optional, explicit LiteLLM refresh. Preview the source and observed-model matches before applying; no background fetch occurs. Provider-compatible unique matches apply automatically, while cross-provider candidates require an explicit alias chosen from observed/catalog dropdowns. Custom prices and provider multipliers remain available. Original valuations are immutable; current-rule revaluation changes immediately. Unknown prices are excluded and reported as coverage, never guessed.
-- **Reported vs estimated** — provider-reported usage and in-memory estimates are separated at every level; failed requests count as requests but never fabricate tokens or cost.
-- **Your data, your machine** — a profile-private SQLite ledger (built-in `node:sqlite`, no native deps). CSV/JSON exports inherit the current filter and anonymize paths and session ids by default; complete backups are a separate, privacy-flagged operation. Purge request details while keeping anonymous day-level totals. Uninstall keeps your ledger.
-- **No patching** — the plugin composes through documented Harness extension points only (bundle rows, slots, loopback RPC, read-only persistence APIs).
+- **Provider connections:** ChatGPT and Grok OAuth capabilities retain `<DSH_HOME>/.oauth.json`; Antigravity retains `<DSH_HOME>/.antigravity-auth.json`, multi-account activation, auto-failover, model route, and loopback proxy behavior. The UI starts OAuth/device authorization, supports Antigravity activation/removal, and imports GLM/Ollama API credentials through DSH Credentials. GLM, Ollama Local, and Ollama Cloud use the same internal provider-adapter seam.
+- **Official observations:** provider-reported product, billing, allowance percentages, and resets are shown separately from local history. Limit values represent exact, range, dynamic, unpublished, or manual knowledge across rolling, fixed, billing-cycle, or rate windows.
+- **Local usage ledger:** the existing `usage.sqlite`, request folding, project attribution, valuation, imports, corrections, exports, backups, retention, and `/token-usage` compatibility channel remain. It is a DSH-observed ledger, not a provider invoice.
+- **Compatibility:** `/account-usage` is the unified loopback channel. `/token-usage` and `/subscription-antigravity` remain for the 4.x transition. When `dsh-subscription-search` is co-installed, it retains exclusive ownership of `/subscription-search`; this bundle registers only its callable ChatGPT/Grok backends through `searchChain` to avoid dual ownership.
+- **Optional search-chain capability:** when the host exposes `searchChain`, ChatGPT/Grok may be registered as callable backends without returning credentials to callers. Search orchestration itself is not part of this package.
 
-## Privacy
+## Ollama behavior
 
-No telemetry. No network requests by default. Prompts, responses, tool arguments, and credentials are never written to the ledger, logs, or exports. Estimation reads message content transiently in host memory only. The optional today summary, CNY display rate, avatars (local files only), and price data all stay local.
+Ollama Local has no applicable remote quota. Ollama Cloud API keys provide documented Bearer-authenticated model access, but no dedicated official quota or validation endpoint is claimed; configured key status is labeled unverified. Settings-page allowance scraping is a separate explicit opt-in: the user manually pastes a Cookie header; only allowlisted Ollama session-cookie names are retained in the owner-only store. The plugin never reads Chrome or another browser profile, refuses redirects so credentials cannot cross origins, and labels parsed plan/session-hourly/weekly observations `official_ui` and `brittle`.
 
-## Data location
+## Privacy and requests
 
-`<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/` — `usage.sqlite` (the ledger) and `settings.json` (display preferences). Linked-development installs fall back to `<DSH_HOME>/dsh-token-usage/`. `uninstall` does not delete this directory; remove it manually for a full wipe.
+Secrets live only in owner-only files or DSH credentials. SQLite, plugin-owned RPC responses, logs, diagnostics, and exports contain no access token, refresh token, API key, Authorization header, Cookie header, or session-cookie value. RPC channels are loopback-only. Ordinary ledger operation makes no network requests; price updates and provider observation refreshes are explicit. Auth refresh and configured model routes contact only their provider endpoints as required. Redirects carrying credentials are rejected and provider origins are allowlisted.
 
-## Limitations
+Prompts, responses, request bodies, and tool arguments are never persisted by this plugin. Ordinary exports anonymize local identifiers by default. Complete backups remain private and uninstall keeps all data.
 
-- Usage is a Harness-observed account, not an upstream invoice: provider-internal retries that never reached the session log are not observable and not guessed.
-- The estimation seam is implemented and tested at the ledger level, but v0.1 does not yet attach the Harness token meter on the host side, so usage-less steps stay "unknown" rather than estimated.
-- Verified against DSH 0.1.1-rc.2 with capability checks at startup; unsupported runtimes get a clear diagnostic instead of silent miscounting.
-- Alert automation, bill/quota reconciliation, agent-skill-tool attribution, cross-profile aggregation, cloud sync, and automatic exchange rates remain out of scope. The v2 workbench plan is in [V2-PLAN.md](V2-PLAN.md).
+## Data and migration
+
+The existing path is unchanged:
+
+`<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/`
+
+Linked development still falls back to `<DSH_HOME>/dsh-token-usage/`. Schema v6 is additive: legacy ledger, `plans`, and `plan_rules` tables remain; v5 plans and both quota windows are projected losslessly as manual estimates. Existing files are backed up before transactional migration. Newer schemas refuse normal writes and have a separate read-only diagnostic seam.
 
 ## Development
 
 ```sh
-pnpm install          # or npm install
-npm run check         # syntax + full test suite (node --test)
-npm run bench:v2      # 100k requests / 10k sessions analytics benchmark
-npm pack --dry-run    # verify the published artifact
+pnpm install
+npm run check
+npm pack --dry-run
 ```
 
-Tests run at the ledger seam: synthetic session fixtures (never real logs), the assembled host plugin over a fake cordis context, installer lifecycles in temporary `DSH_HOME`s, migration/rollback, export anonymization, and the client bundle's module-loader contract.
+Tests use synthetic data and temporary `DSH_HOME` directories. The package targets the capabilities verified against DSH 0.1.1-rc.2 and Node 22.19+; it does not claim broader compatibility.
 
 ## License
 

@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict'
+import { mkdtemp, readFile, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import test from 'node:test'
+
+import { OAuthCredentialFileStore, parseOAuthDocument } from '../lib/capabilities/chatgpt-grok/oauth-store.js'
+import { AuthStore, parseAuthDocument } from '../lib/capabilities/antigravity/auth-store.js'
+import { createAccountRouter, isQuotaExhaustion } from '../lib/capabilities/antigravity/account-router.js'
+import {
+  antigravityRoutePatch,
+  antigravityRouteNeedsProvisioning,
+} from '../lib/capabilities/antigravity/capability.js'
+
+async function mode(path) {
+  return (await stat(path)).mode & 0o777
+}
+
+test('OAuth credential store preserves .oauth.json schema and owner-only modes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-oauth-'))
+  const directory = join(root, 'private')
+  const filename = join(directory, '.oauth.json')
+  const store = new OAuthCredentialFileStore({ filename, onChanged: () => {}, onError: assert.fail })
+  await store.init()
+  await store.modify('openai-codex', () => ({
+    type: 'oauth', access: 'access-token', refresh: 'refresh-token', expires: 123456789,
+    accountId: 'account-id',
+  }))
+  const parsed = parseOAuthDocument(await readFile(filename, 'utf8'))
+  assert.equal(parsed.get('openai-codex').accountId, 'account-id')
+  if (process.platform !== 'win32') {
+    assert.equal(await mode(directory), 0o700)
+    assert.equal(await mode(filename), 0o600)
+  }
+  await store.dispose()
+})
+
+test('Antigravity auth store preserves v2 account/failover state and owner-only modes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-antigravity-'))
+  const directory = join(root, 'private')
+  const filename = join(directory, '.antigravity-auth.json')
+  const store = new AuthStore({ filename, onError: assert.fail })
+  await store.init()
+  await store.upsertAccount('account-a', {
+    type: 'oauth', access: 'access-token', refresh: 'refresh-token', expires: 123456789,
+    email: 'user@example.com', projectId: 'project-a', createdAt: 1,
+  })
+  await store.setAutoFailover(true)
+  const parsed = parseAuthDocument(await readFile(filename, 'utf8'))
+  assert.equal(parsed.activeAccountId, 'account-a')
+  assert.equal(parsed.autoFailover, true)
+  assert.equal(parsed.accounts.get('account-a').projectId, 'project-a')
+  if (process.platform !== 'win32') {
+    assert.equal(await mode(directory), 0o700)
+    assert.equal(await mode(filename), 0o600)
+  }
+  await store.dispose()
+})
+
+test('Antigravity route patch keeps user models while repairing owned connectivity fields', () => {
+  const models = [{ id: 'custom', name: 'Custom' }]
+  const proxyUrl = 'http://127.0.0.1:51122/v1'
+  const patch = antigravityRoutePatch({ displayName: 'Mine', models }, proxyUrl)
+  assert.equal(patch.displayName, 'Mine')
+  assert.equal(patch.models, models)
+  assert.equal(patch.apiKeyEnv, 'ANTIGRAVITY_ACCESS_TOKEN')
+  assert.equal(patch.api, 'openai-completions')
+  assert.equal(patch.baseURL, proxyUrl)
+  assert.deepEqual(patch.compat, { supportsDeveloperRole: false, maxTokensField: 'max_tokens' })
+  assert.equal(antigravityRouteNeedsProvisioning(patch, proxyUrl), false)
+})
+
+test('Account router fails over only on quota exhaustion and activates successful account', async () => {
+  assert.equal(isQuotaExhaustion({ status: 429, text: 'RESOURCE_EXHAUSTED' }), true)
+  assert.equal(isQuotaExhaustion({ status: 429, text: 'RATE_LIMIT_EXCEEDED' }), false)
+  let active = 'a'
+  const activated = []
+  const auth = {
+    getActiveContext: async () => ({ accountId: active, token: active }),
+    getAccountContext: async accountId => ({ accountId, token: accountId }),
+    activeAccountId: () => active,
+    autoFailoverEnabled: () => true,
+    statuses: () => [{ accountId: 'a' }, { accountId: 'b' }],
+    activateAccount: async accountId => { active = accountId },
+  }
+  const router = createAccountRouter({
+    auth,
+    usage: { remainingFor: () => 1 },
+    onActivated: async accountId => activated.push(accountId),
+  })
+  const outcome = await router.route({
+    runtimeModel: 'gemini-3.6-flash-low',
+    attempt: async context => context.accountId === 'a'
+      ? { ok: false, status: 429, text: 'QUOTA_EXHAUSTED' }
+      : { ok: true, response: 'ok' },
+  })
+  assert.equal(outcome.ok, true)
+  assert.equal(outcome.accountId, 'b')
+  assert.equal(outcome.switched, true)
+  assert.equal(active, 'b')
+  assert.deepEqual(activated, ['b'])
+})

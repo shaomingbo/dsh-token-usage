@@ -1,7 +1,7 @@
 {
   "name": "dsh-token-usage",
-  "version": "3.0.0",
-  "description": "Local token usage ledger for DeepSeek Harness: billing-pool dashboard, dock panel, and sidebar micro indicator. No telemetry, no prompts stored.",
+  "version": "4.0.0",
+  "description": "DSH Accounts & Usage: unified provider connections, official allowance observations, and a separate local usage ledger. No telemetry, prompts, or secrets in SQLite/RPC/log/export.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -20,11 +20,14 @@
     "bench/analytics.mjs",
     "README.md",
     "README.zh.md",
+    "CONTEXT.md",
+    "SPEC.md",
+    "docs/research",
     "LICENSE"
   ],
   "scripts": {
     "test": "node --test",
-    "check": "node --check lib/*.js && node --check lib/ledger/*.js && node --check bin/install.js && node --test",
+    "check": "find lib -name '*.js' -print0 | xargs -0 -n1 node --check && node --check bin/install.js && node --test",
     "bench:v2": "node bench/analytics.mjs"
   },
   "dsh": {
@@ -62,5 +65,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^0.82.1"
   }
 }

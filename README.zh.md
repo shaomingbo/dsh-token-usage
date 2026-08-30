@@ -1,77 +1,65 @@
-# dsh-token-usage
+# DSH Accounts & Usage
 
-[DeepSeek Harness](https://github.com/shaomingbo/deepseek-harness) 的本地 Token 用量与费用分析插件：以个人资料式仪表盘展示 harness 处理了什么 —— Token、请求、项目、会话、模型、提供方与估算费用。无遥测。不存提示词。不 patch DSH。
+`dsh-token-usage` 4.0.0 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
 
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0
 ```
 
-这一条命令会把 bundle 安装到 `web` profile。之后请**手动重启 DSH 并强制刷新 Web GUI** —— 安装器绝不会停止或触碰运行中的 DSH 进程。
-
-其他命令：
+默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v0.1.0
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 status
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v4.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --help
 ```
 
-- `--profile <name>` — 目标 DSH profile（默认 `web`）
-- `--source <source>` — 包来源；默认固定在 `v3.0.0` tag（绝不使用浮动分支）
-- `DSH_TOKEN_USAGE_SOURCE` — 通过环境变量覆盖来源
+`--profile` 默认是 `web`；`--source` 默认固定到 `v4.0.0` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
 
 ### 本地开发
 
 ```sh
-dsh-token-usage --source link:/绝对路径/dsh-token-usage
-# 或
-npx --yes github:shaomingbo/dsh-token-usage#v3.0.0 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --source link:$PWD
 ```
 
-### 手动兜底
+安装器只原子修改 `dependencies["dsh-token-usage"]` 和 `dsh.profile.bundles`，执行 `pnpm install --ignore-scripts`（含 corepack 回退），失败时恢复 manifest。手工修改同样两个字段仅作为兜底。
 
-安装器只修改 `profiles/<name>/package.json` 的两个位置 —— `dependencies["dsh-token-usage"]` 与 `dsh.profile.bundles` —— 然后在 profile 目录运行 `pnpm install --ignore-scripts`。你也可以手动完成这两处修改；写入是原子的，依赖安装失败时自动回滚。
+## 产品模型
 
-## 功能
+规范词汇见 [`CONTEXT.md`](CONTEXT.md)：Connection、Credential、Product、Billing、Limit、Observation、Usage Ledger、Attribution Rule。
 
-- **三层客观界面** —— 左侧栏微览（最紧计费池 + 月进度）、右侧停靠面板、全屏仪表盘。等值 $ / 新计算 Token / 请求三口径切换不改数据；30 天活动图可按池或按模型堆叠；模型跨池排行。没有教练文案 —— 只有数字和标明的算术外推。
-- **计费池** —— 你配置订阅（额度、重置日、月费）和预付/中转余额（余额、到期日）。归因规则按 provider/模型通配匹配；未匹配进入「未归属」桶。规则变更不改写请求历史。
-- **数据与设置角落** —— 池/规则编辑器、定价别名/覆盖/LiteLLM 刷新、导入导出备份清理、显示设置。v2 四空间工作台、详情栈、预算 UI、保存视图已移除（账本表保留）。
-- **自动历史导入** —— 插件安装前的会话在后台以只读方式导入（可暂停、取消、续传）。错过的实时事件会从持久日志补齐。
-- **正确的计数** —— 每个 session/turn/step 只算一次可观测调用；同一调用的后到 usage 样本整体替换而非累加；fork 继承的种子前缀绝不重复计费；子代理用量只在其自身会话计一次，并沿谱系上卷；compaction 不产生计费；reasoning token 始终是 output 的标注子集。
-- **诚实的费用** —— 估算使用内置版本化快照，并支持用户显式从 LiteLLM 更新。更新前先预览数据源与已观测模型的匹配结果；插件不会后台联网。provider 兼容且唯一的候选自动匹配；跨 provider 候选必须在「已观测模型 → 价格目录模型」下拉框中明确选择。仍支持自定义价格与提供方倍率。原始计价不可变；当前规则重算立即生效。未知价格不计入并显示覆盖率，绝不猜测。
-- **上报与估算分离** —— provider 上报的用量与内存估算在每一层都分开；失败请求计入请求数但绝不虚构 Token 或费用。
-- **数据留在本机** —— profile 私有的 SQLite 账本（内置 `node:sqlite`，无原生依赖）。CSV/JSON 导出继承当前筛选，并默认匿名化路径与会话 ID；完整备份是单独的、带隐私警告的操作。清理请求明细时保留匿名日级合计。卸载插件保留账本。
-- **零 patch** —— 仅通过 Harness 文档化的扩展点组合（bundle 行、slots、loopback RPC、只读持久化 API）。
+- **提供方连接：** ChatGPT/Grok OAuth 保留 `<DSH_HOME>/.oauth.json`；Antigravity 保留 `<DSH_HOME>/.antigravity-auth.json`、多账号切换、自动故障转移、模型路由和本地代理语义。UI 可发起 OAuth/设备授权、激活或移除 Antigravity 账号，并通过 DSH Credentials 导入 GLM/Ollama API 凭据。GLM、Ollama Local、Ollama Cloud 走同一个内部 ProviderAdapter seam。
+- **官方观察：** 提供方声明的产品、计费、额度百分比与重置时间，和本地账本严格分开展示。额度支持 exact/range/dynamic/unpublished/manual，以及 rolling/fixed/billing/rate 窗口。
+- **本地用量账本：** 现有 `usage.sqlite`、请求折叠、项目归因、估值、导入、修正、导出、备份和保留策略全部保留。它是 DSH 可观察账本，不是提供方账单。
+- **兼容性：** 新统一通道为仅回环的 `/account-usage`。4.x 过渡期保留 `/token-usage`、`/subscription-antigravity`。若同时安装 `dsh-subscription-search`，`/subscription-search` 由它独占；本包只通过 `searchChain` 注册 ChatGPT/Grok 可调用后端，避免双重所有权。
+- **可选搜索能力：** 主机提供 `searchChain` 时，可注册不泄露令牌的 ChatGPT/Grok 可调用后端；本包不包含搜索编排。
 
-## 隐私
+## Ollama 行为
 
-无遥测。默认无网络请求。提示词、回答、工具参数与凭据绝不写入账本、日志或导出。估算仅在 host 内存中临时读取消息内容。今日摘要、CNY 显示汇率、头像（仅本地图片）与价格数据全部留在本地。
+Ollama Local 的远端额度为“不适用”。Ollama Cloud API Key 有官方 Bearer 模型访问语义，但没有专用的官方额度或校验端点，因此已配置 Key 的状态明确标为“未验证”。设置页额度抓取是独立显式开关：用户手工粘贴 Cookie Header；只把白名单内的 Ollama 会话 cookie 写入 owner-only 存储。本插件绝不读取 Chrome 或其他浏览器目录；携带凭据的重定向会被拒绝；解析出的套餐、会话/小时、周百分比及重置时间标记为 `official_ui`、`brittle`。
 
-## 数据位置
+## 隐私与请求
 
-`<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/` —— `usage.sqlite`（账本）与 `settings.json`（显示偏好）。本地 `link:` 开发安装回退到 `<DSH_HOME>/dsh-token-usage/`。`uninstall` 不会删除该目录；如需彻底清除请手动删除。
+秘密只存在于 owner-only 文件或 DSH credentials 中。SQLite、RPC 返回、日志、诊断和导出都不得包含 access/refresh token、API key、Authorization、Cookie Header 或会话 cookie 值。RPC 仅允许 loopback。普通账本运行不联网；价格更新和提供方观察刷新必须显式触发。认证刷新和已配置模型路由只在必要时访问对应提供方。所有提供方来源都使用 origin 白名单，并拒绝可能泄漏凭据的跨域重定向。
 
-## 限制
+提示词、回复、请求体、工具参数都不会被本插件持久化。普通导出默认匿名化；完整备份应视为私密文件；卸载保留数据。
 
-- 用量是 Harness 可观测的账目，不是上游账单：从未进入会话日志的 provider 内部重试不可观测，也不会被猜测。
-- 估算 seam 已在账本层实现并有测试，但 v0.1 尚未在 host 侧接上 Harness token meter，因此缺失 usage 的步骤保持「未知」而非估算。
-- 已在 DSH 0.1.1-rc.2 验证，启动时做能力检查；不支持的运行时会得到明确诊断而非静默错算。
-- 告警自动化、账单/额度对账、agent/skill/tool 归因、跨 profile 聚合、云同步和自动汇率仍不在范围内。v2 工作台方案见 [V2-PLAN.md](V2-PLAN.md)。
+## 数据与迁移
 
-## 开发
+原路径不变：`<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/`。link 开发仍回退到 `<DSH_HOME>/dsh-token-usage/`。schema v6 为纯增量：保留原账本、`plans`、`plan_rules`；v5 套餐和两个窗口无损映射为 manual estimate。迁移前自动备份并在事务内执行。遇到更新 schema 时普通写入会拒绝，另有只读诊断 seam。
+
+## 开发检查
 
 ```sh
-pnpm install          # 或 npm install
-npm run check         # 语法 + 完整测试（node --test）
-npm run bench:v2      # 10 万请求 / 1 万会话分析基准
-npm pack --dry-run    # 校验发布产物
+pnpm install
+npm run check
+npm pack --dry-run
 ```
 
-测试落在 ledger seam：合成会话 fixture（绝不使用真实日志）、假 cordis 上下文下的 host 插件装配、临时 `DSH_HOME` 安装器生命周期、迁移与回滚、导出匿名化，以及 client bundle 的 module-loader 契约。
+测试只使用合成数据和临时 `DSH_HOME`。当前能力针对 DSH 0.1.1-rc.2 与 Node 22.19+ 验证，不宣称更广兼容性。
 
 ## 许可证
 
