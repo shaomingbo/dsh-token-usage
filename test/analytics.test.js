@@ -185,6 +185,88 @@ test('monthly budgets report scoped progress and suppress immature forecasts', (
   }
 })
 
+test('session page uses the last session/title and updates after a title-only reimport', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const untitled = session({ id: 'named', cwd: '/work/repo-a', time: T0 })
+    service.importSession(untitled)
+    const before = service.query({
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['page'],
+      page: { entity: 'session', limit: 10 },
+    })
+    assert.match(before.page.rows[0].label, /^Session • /)
+    assert.equal(before.page.rows[0].sessionTitle, null)
+
+    service.importSession({
+      header: untitled.header,
+      events: [
+        { type: 'session/title', seq: 10, time: T0 + 10, data: { title: 'New Conversation' } },
+        { type: 'session/title', seq: 11, time: T0 + 11, data: { title: '用量统计插件交互重构' } },
+      ],
+    })
+    const after = service.query({
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['page'],
+      page: { entity: 'session', limit: 10 },
+    })
+    assert.equal(after.page.rows[0].label, '用量统计插件交互重构')
+    assert.equal(after.page.rows[0].sessionTitle, '用量统计插件交互重构')
+
+    const inspected = service.inspect({ kind: 'session', id: 'named', filter: { timezone: 'UTC' } })
+    assert.equal(inspected.identity.title, '用量统计插件交互重构')
+
+    service.ingestEvent(untitled.header, {
+      type: 'session/title',
+      seq: 12,
+      time: T0 + 12,
+      data: { title: '部分条目无标题根因排查' },
+    })
+    const live = service.query({
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['page'],
+      page: { entity: 'session', limit: 10 },
+    })
+    assert.equal(live.page.rows[0].label, '部分条目无标题根因排查')
+    assert.equal(live.page.rows[0].sessionTitle, '部分条目无标题根因排查')
+  } finally {
+    service.dispose()
+  }
+})
+
+test('session page can rank by processing tokens instead of last activity', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    service.importSession(session({ id: 'small-recent', cwd: '/work/repo-a', time: T0 + DAY, input: 10, output: 5, cache: 0 }))
+    service.importSession(session({ id: 'large-older', cwd: '/work/repo-a', time: T0, input: 1000, output: 500, cache: 2000 }))
+    const recent = service.query({
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['page'],
+      page: { entity: 'session', limit: 6 },
+    })
+    assert.deepEqual(recent.page.rows.map((row) => row.id), ['small-recent', 'large-older'])
+
+    const largest = service.query({
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['page'],
+      page: { entity: 'session', limit: 6, orderBy: 'processingTokens' },
+    })
+    assert.deepEqual(largest.page.rows.map((row) => row.id), ['large-older', 'small-recent'])
+    assert.equal(largest.page.rows[0].processingTokens > largest.page.rows[1].processingTokens, true)
+
+    assert.throws(
+      () => service.query({
+        filter: { timezone: 'UTC', time: { preset: 'all' } },
+        views: ['page'],
+        page: { entity: 'session', orderBy: 'not-a-metric' },
+      }),
+      /unsupported session page order/,
+    )
+  } finally {
+    service.dispose()
+  }
+})
+
 test('session exploration and activity views remain content-neutral', () => {
   const service = createLedgerService({ databasePath: ':memory:' })
   try {

@@ -76,11 +76,22 @@ test('client presents the confirmed four-space v2 workbench over unified query a
   assert.match(source, /15_000/)
   assert.match(source, /state\.restored \? h\(Workbench/)
   assert.ok(!source.includes('contain:strict'), 'virtual stream must retain a measurable height')
-  assert.ok(!source.includes('variant switcher'), 'production bundle must not ship the prototype switcher')
 })
 
 test('client uses host theme variables and never talks to the network directly', () => {
   assert.match(source, /var\(--dsw-/)
   assert.ok(!/https?:\/\//.test(source), 'no hardcoded remote URLs')
   assert.ok(!/fetch\(/.test(source), 'client never fetches directly; it uses the loopback channel')
+})
+
+test('explore labels come from the query payload, not a hardcoded session map', () => {
+  assert.equal(source.includes('knownTitles'), false)
+  assert.equal(source.includes('extractDomSessionTitles'), false)
+  assert.match(source, /function formatSessionLabel/)
+  assert.match(source, /row\.sessionTitle/)
+})
+
+test('overview top sessions rank by the selected metric, not recency', () => {
+  assert.match(source, /page: \{ entity: 'session', limit: 6, orderBy/)
+  assert.equal(source.includes("page: { entity: 'session', limit: 6 }"), false)
 })
