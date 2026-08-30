@@ -80,6 +80,9 @@ test('v4 client separates provider connections and official observations from th
   assert.ok(source.includes("OLLAMA_SESSION_COOKIE"))
   assert.ok(source.includes("cookieOptIn"))
   assert.ok(source.includes("connection-action"))
+  assert.ok(source.includes("'sync-model-catalog'"))
+  assert.ok(source.includes('Sync Cloud models'))
+  assert.ok(source.includes('同步 Cloud 模型'))
 })
 
 test('v3 ledger dashboard remains available over query and entry-summary RPCs', () => {

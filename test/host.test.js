@@ -33,7 +33,7 @@ function syntheticSession(id) {
   return { header, events }
 }
 
-function fakeCtx() {
+function fakeCtx({ credentialValues = {}, settingsValue = {} } = {}) {
   const eventListeners = new Map()
   const channels = new Map()
   const intervals = []
@@ -45,12 +45,12 @@ function fakeCtx() {
     interval: (fn) => { intervals.push(fn) },
     provide: (id, value) => { provided.set(id, value) },
     credentials: {
-      describe: async () => ({ configured: false }),
-      resolve: async () => undefined,
-      set: async () => {},
+      describe: async ref => ({ configured: typeof credentialValues[ref] === 'string' && credentialValues[ref].length > 0 }),
+      resolve: async ref => typeof credentialValues[ref] === 'string' ? { value: credentialValues[ref] } : undefined,
+      set: async (ref, value) => { credentialValues[ref] = value },
     },
     settings: {
-      value: {},
+      value: structuredClone(settingsValue),
       get(key) { return this.value[key] },
       async update(key, patch) {
         this.value[key] = { ...(this.value[key] ?? {}), ...patch, providers: { ...(this.value[key]?.providers ?? {}), ...(patch.providers ?? {}) } }
@@ -91,6 +91,62 @@ test('module contract: name and host injections', () => {
   assert.ok(inject.includes('sessionPersistence'))
   assert.ok(inject.includes('settings'))
   assert.ok(inject.includes('timer'))
+})
+
+test('an existing Ollama Cloud credential provisions its missing selectable model route at startup', async () => {
+  const originalFetch = globalThis.fetch
+  const env = tempHome()
+  process.env.DSH_HOME = env.home
+  try {
+    globalThis.fetch = async (url, init = {}) => {
+      if (String(url).endsWith('/api/tags')) {
+        return new Response(JSON.stringify({ models: [{ name: 'cloud-model', model: 'cloud-model' }] }), { status: 200 })
+      }
+      assert.equal(JSON.parse(init.body).model, 'cloud-model')
+      return new Response(JSON.stringify({
+        capabilities: ['completion', 'thinking'],
+        model_info: { 'general.architecture': 'cloud', 'cloud.context_length': 131072 },
+      }), { status: 200 })
+    }
+    const { ctx } = fakeCtx({ credentialValues: { OLLAMA_API_KEY: 'test-secret' } })
+    apply(ctx, { providerProxy: false })
+    await settle(120)
+    assert.deepEqual(ctx.settings.value['llm-pi-ai'].providers['ollama-cloud'].models, [{
+      id: 'cloud-model', name: 'cloud-model', contextWindow: 131072, input: ['text'],
+      reasoningEfforts: { off: 'none', low: 'low', medium: 'medium', high: 'high', max: 'max' },
+    }])
+  } finally {
+    globalThis.fetch = originalFetch
+    env.cleanup()
+  }
+})
+
+test('account RPC explicitly synchronizes the Ollama Cloud model catalog without returning credentials', async () => {
+  const env = tempHome()
+  process.env.DSH_HOME = env.home
+  try {
+    const fetchImpl = async (url, init = {}) => String(url).endsWith('/api/tags')
+      ? new Response(JSON.stringify({ models: [{ name: 'rpc-model', model: 'rpc-model' }] }), { status: 200 })
+      : new Response(JSON.stringify({
+        capabilities: ['completion'],
+        model_info: { 'general.architecture': 'rpc', 'rpc.context_length': 65536 },
+      }), { status: 200 })
+    const { ctx, channels } = fakeCtx({ credentialValues: { OLLAMA_API_KEY: 'test-secret' } })
+    apply(ctx, { providerProxy: false, fetchImpl })
+    await settle(80)
+    const accountChannel = channels.get('/account-usage')
+    assert.equal((await accountChannel.handler('sync-model-catalog', { providerId: 'ollama-cloud' })).error.code, 'explicit-refresh-required')
+    const synced = await accountChannel.handler('sync-model-catalog', { providerId: 'ollama-cloud', refresh: true })
+    assert.equal(synced.ok, true)
+    assert.equal(synced.value.modelCount, 1)
+    assert.equal(JSON.stringify(synced).includes('test-secret'), false)
+    const summary = await accountChannel.handler('summary', {})
+    assert.deepEqual(summary.value.modelCatalogs, [{
+      providerId: 'ollama-cloud', routeId: 'ollama-cloud', configured: true, modelCount: 1, credentialConfigured: true,
+    }])
+  } finally {
+    env.cleanup()
+  }
 })
 
 test('provider capability logs redact common credential forms', () => {

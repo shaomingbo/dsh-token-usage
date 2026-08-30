@@ -1,28 +1,28 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 4.0.1 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
+`dsh-token-usage` 4.1.0 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
 
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.1
+npx --yes github:shaomingbo/dsh-token-usage#v4.1.0
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 status
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --profile web --source github:shaomingbo/dsh-token-usage#v4.0.1
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --help
+npx --yes github:shaomingbo/dsh-token-usage#v4.1.0 status
+npx --yes github:shaomingbo/dsh-token-usage#v4.1.0 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v4.1.0 --profile web --source github:shaomingbo/dsh-token-usage#v4.1.0
+npx --yes github:shaomingbo/dsh-token-usage#v4.1.0 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到 `v4.0.1` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
+`--profile` 默认是 `web`；`--source` 默认固定到 `v4.1.0` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
 
 ### 本地开发
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v4.1.0 --source link:$PWD
 ```
 
 安装器只原子修改 `dependencies["dsh-token-usage"]` 和 `dsh.profile.bundles`，执行 `pnpm install --ignore-scripts`（含 corepack 回退），失败时恢复 manifest。手工修改同样两个字段仅作为兜底。
@@ -39,7 +39,7 @@ npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --source link:$PWD
 
 ## Ollama 行为
 
-Ollama Local 的远端额度为“不适用”。Ollama Cloud API Key 有官方 Bearer 模型访问语义，但没有专用的官方额度或校验端点，因此已配置 Key 的状态明确标为“未验证”。设置页额度抓取是独立显式开关：用户手工粘贴 Cookie Header；只把白名单内的 Ollama 会话 cookie 写入 owner-only 存储。本插件绝不读取 Chrome 或其他浏览器目录；携带凭据的重定向会被拒绝；解析出的套餐、会话/小时、周百分比及重置时间标记为 `official_ui`、`brittle`。
+Ollama Local 的远端额度为“不适用”。保存 Ollama Cloud API Key 后，插件会同步官方 `/api/tags` 目录，通过 `/api/show` 补全每个 completion 模型，并把 `ollama-cloud` 路由注册到官方 OpenAI-compatible 入口 `https://ollama.com/v1`。上下文容量、视觉输入和 thinking 档位均来自官方模型详情；只有详情明确给出 `num_predict` 时才写入输出上限。账户卡提供手动同步按钮，模型增删可在不重启 DSH 的情况下刷新。由于没有专用的官方额度端点，已配置 Key 的状态仍明确标为“未验证”。设置页额度抓取是独立显式开关：用户手工粘贴 Cookie Header；只把白名单内的 Ollama 会话 cookie 写入 owner-only 存储。本插件绝不读取 Chrome 或其他浏览器目录；携带凭据的重定向会被拒绝；解析出的套餐、会话/小时、周百分比及重置时间标记为 `official_ui`、`brittle`。
 
 ## 隐私与请求
 

@@ -90,10 +90,13 @@ Relevant official endpoints are:
 
 ```text
 GET  https://ollama.com/api/tags
+POST https://ollama.com/api/show
 POST https://ollama.com/api/web_search
 ```
 
 `GET /api/tags` returns an object with `models[]`. Documented model fields include `name`, `model`, `remote_model`, `remote_host`, `modified_at`, `size`, `digest`, and nested `details` (`format`, `family`, `families`, `parameter_size`, `quantization_level`) ([List models](https://docs.ollama.com/api/tags)).
+
+`POST /api/show` accepts a model id and returns serialized `parameters`, `capabilities`, high-level `details`, and architecture-specific `model_info`; a positive `*.context_length` is the documented model-capacity fact used by the DSH model route ([Show model details](https://docs.ollama.com/api-reference/show-model-details#show-model-details)). Ollama also documents OpenAI-compatible `/v1/chat/completions`, `/v1/models`, vision, tools, usage, and reasoning effort support ([OpenAI compatibility](https://docs.ollama.com/api/openai-compatibility)); direct Cloud inference uses the same Ollama host with Bearer authentication.
 
 `POST /api/web_search` requires JSON with `query` (string) and optionally `max_results` (1–10, default 5); success returns `results[]` with `title`, `url`, and `content` ([Web search](https://docs.ollama.com/capabilities/web-search)). The official example uses the same Bearer header.
 

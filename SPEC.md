@@ -1,4 +1,4 @@
-# DSH Accounts & Usage 4.0.1 Specification
+# DSH Accounts & Usage 4.1.0 Specification
 
 ## 4.0 Product Amendment
 
@@ -11,6 +11,12 @@ The integrated provider capability set is ChatGPT/Grok OAuth and allowance usage
 Schema v6 retains every legacy table and transactionally maps v5 plans and both windows into manual-estimate Products/Billing/Limits. Existing files receive a pre-migration backup. Normal writes reject a newer schema; a separate read-only diagnostic opening is available for downgrade inspection.
 
 The 4.0 UI is Accounts & Usage: provider connection cards and official observations appear separately from local ledger analytics. Domain/storage/adapter and host behavior take precedence over pixel polish.
+
+## 4.1 Ollama Cloud Model Amendment
+
+A configured `OLLAMA_API_KEY` provisions one `ollama-cloud` model route without moving or copying the credential. The plugin reads the official `GET https://ollama.com/api/tags` catalog and `POST https://ollama.com/api/show` details, then writes only secret-free route metadata under `llm-pi-ai.providers.ollama-cloud`. Inference uses Ollama's official OpenAI-compatible `https://ollama.com/v1` endpoint.
+
+Only completion-capable models enter the route. Effective context uses a positive configured `num_ctx`, then the architecture-specific `model_info.*.context_length`; vision and thinking come from `capabilities`. Output capacity is written only for a positive `num_predict`. Detail failures retain listed models and any prior metadata, while list failures or empty listings never erase the previous route. Initial provisioning occurs only when a credential exists and the route is absent; later catalog reconciliation is explicit. A conflicting user-owned route is refused before the credential reaches the network.
 
 ## Problem Statement
 
