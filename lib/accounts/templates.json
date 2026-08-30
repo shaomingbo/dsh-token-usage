@@ -1,0 +1,297 @@
+{
+  "version": 1,
+  "source": "bundled-catalog",
+  "note": "Product templates for account creation. Structure follows docs/research/coding-plan-landscape.md (2026-09-02 snapshot): stable billing/window semantics, values only where officially published. Prices and quotas change; this catalog is host-side data, updatable without a client release.",
+  "templates": [
+    {
+      "id": "chatgpt-codex",
+      "providerId": "openai-codex",
+      "name": "ChatGPT · Codex",
+      "kind": "subscription",
+      "color": "#3d6ee8",
+      "providerAliases": ["openai-codex", "openai", "chatgpt"],
+      "tiers": [
+        { "id": "plus", "name": "Plus", "priceUsd": 20 },
+        { "id": "pro", "name": "Pro", "priceUsd": 200 },
+        { "id": "business", "name": "Business", "priceUsd": null }
+      ],
+      "limits": [
+        { "externalKey": "primary", "unit": "percent", "valueMode": "dynamic", "windowKind": "rolling", "windowSeconds": 18000 },
+        { "externalKey": "weekly", "unit": "percent", "valueMode": "unpublished", "windowKind": "rolling", "windowSeconds": 604800 }
+      ],
+      "notes": "Official limits are dynamic/unpublished; connect the ChatGPT OAuth to observe primary/weekly percentages."
+    },
+    {
+      "id": "xai-grok",
+      "providerId": "xai-grok",
+      "name": "Grok / X subscription",
+      "kind": "subscription",
+      "color": "#7a5af8",
+      "providerAliases": ["xai-grok", "grok-build", "xai", "grok"],
+      "tiers": [
+        { "id": "supergrok", "name": "SuperGrok", "priceUsd": null },
+        { "id": "business", "name": "Business", "priceUsd": null }
+      ],
+      "limits": [
+        { "externalKey": "primary", "unit": "percent", "valueMode": "dynamic", "windowKind": "rolling", "windowSeconds": 18000 },
+        { "externalKey": "weekly", "unit": "percent", "valueMode": "unpublished", "windowKind": "rolling", "windowSeconds": 604800 }
+      ],
+      "notes": "Official coding-plan quotas are not published; observe primary/weekly percentages through the Grok OAuth."
+    },
+    {
+      "id": "antigravity",
+      "providerId": "antigravity",
+      "name": "Antigravity",
+      "kind": "subscription",
+      "color": "#d9822b",
+      "providerAliases": ["antigravity", "google-antigravity"],
+      "tiers": [
+        { "id": "default", "name": "Subscription", "priceUsd": null }
+      ],
+      "limits": [],
+      "notes": "Per-account per-model quotas are observed from the official usage endpoint; weekly caps are not published."
+    },
+    {
+      "id": "glm-coding-plan",
+      "providerId": "glm",
+      "name": "GLM Coding Plan",
+      "kind": "subscription",
+      "color": "#0f9d8f",
+      "providerAliases": ["glm", "zai-coding-cn", "zai", "bigmodel"],
+      "tiers": [
+        { "id": "lite", "name": "Lite", "priceUsd": null, "limitValues": { "primary": 2000, "weekly": 10000 } },
+        { "id": "pro", "name": "Pro", "priceUsd": null, "limitValues": { "primary": 12000, "weekly": 60000 } },
+        { "id": "max", "name": "Max", "priceUsd": null, "limitValues": { "primary": 28000, "weekly": 140000 } }
+      ],
+      "limits": [
+        { "externalKey": "primary", "unit": "credits", "valueMode": "exact", "windowKind": "rolling", "windowSeconds": 18000 },
+        { "externalKey": "weekly", "unit": "credits", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 604800 }
+      ],
+      "notes": "Officially published plan credits (research snapshot 2026-09). Credits are plan units, not ledger tokens: percentages come from the official observation, never from local token math."
+    },
+    {
+      "id": "claude-code",
+      "providerId": "claude",
+      "name": "Claude Code",
+      "kind": "subscription",
+      "color": "#c2417f",
+      "providerAliases": ["claude", "anthropic", "claude-code"],
+      "tiers": [
+        { "id": "pro", "name": "Pro", "priceUsd": 20 },
+        { "id": "max5", "name": "Max 5x", "priceUsd": 100 },
+        { "id": "max20", "name": "Max 20x", "priceUsd": 200 }
+      ],
+      "limits": [
+        { "externalKey": "primary", "unit": "percent", "valueMode": "dynamic", "windowKind": "rolling", "windowSeconds": 18000 },
+        { "externalKey": "weekly", "unit": "percent", "valueMode": "unpublished", "windowKind": "rolling", "windowSeconds": 604800 }
+      ],
+      "notes": "No public consumer remaining API; limits are dynamic/unpublished. Usage credits are a separate wallet pool."
+    },
+    {
+      "id": "kimi-code",
+      "providerId": "kimi",
+      "name": "Kimi Code",
+      "kind": "subscription",
+      "color": "#8a93a3",
+      "providerAliases": ["kimi", "moonshot"],
+      "tiers": [
+        { "id": "membership", "name": "会员", "priceUsd": null }
+      ],
+      "limits": [
+        { "externalKey": "primary", "unit": "percent", "valueMode": "dynamic", "windowKind": "rolling", "windowSeconds": 18000 },
+        { "externalKey": "weekly", "unit": "percent", "valueMode": "dynamic", "windowKind": "rolling", "windowSeconds": 604800 }
+      ],
+      "notes": "Membership month pool + Code 5h/weekly overlays + Extra Usage wallet; numbers only in the official console."
+    },
+    {
+      "id": "minimax-token-plan",
+      "providerId": "minimax",
+      "name": "MiniMax Token Plan",
+      "kind": "subscription",
+      "color": "#7a5af8",
+      "providerAliases": ["minimax", "minimaxi"],
+      "tiers": [
+        { "id": "standard", "name": "Standard", "priceUsd": null }
+      ],
+      "limits": [
+        { "externalKey": "primary", "unit": "percent", "valueMode": "dynamic", "windowKind": "rolling", "windowSeconds": 18000 },
+        { "externalKey": "weekly", "unit": "percent", "valueMode": "dynamic", "windowKind": "rolling", "windowSeconds": 604800 }
+      ],
+      "notes": "Quota numbers are runtime facts from the console progress bars; an official remains API exists but its schema is unpublished."
+    },
+    {
+      "id": "mimo-token-plan",
+      "providerId": "mimo",
+      "name": "MiMo Token Plan",
+      "kind": "subscription",
+      "color": "#ff6900",
+      "providerAliases": ["mimo", "xiaomi"],
+      "tiers": [
+        { "id": "monthly", "name": "月付", "priceUsd": null },
+        { "id": "yearly", "name": "年付", "priceUsd": null }
+      ],
+      "limits": [
+        { "externalKey": "term", "unit": "percent", "valueMode": "dynamic", "windowKind": "fixed", "windowSeconds": null }
+      ],
+      "notes": "One credit pool for the whole subscription term; no 5h/weekly windows."
+    },
+    {
+      "id": "gemini-code-assist",
+      "providerId": "gemini",
+      "name": "Gemini Code Assist",
+      "kind": "subscription",
+      "color": "#1a73e8",
+      "providerAliases": ["gemini", "gemini-code-assist", "google"],
+      "tiers": [
+        { "id": "standard", "name": "Standard", "priceUsd": null, "limitValues": { "daily": 1500 } },
+        { "id": "enterprise", "name": "Enterprise", "priceUsd": null, "limitValues": { "daily": 2000 } }
+      ],
+      "limits": [
+        { "externalKey": "daily", "unit": "requests", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 86400 }
+      ],
+      "notes": "Model requests per user per day; one user prompt may emit several model requests. Agent mode and Gemini CLI share the daily pool."
+    },
+    {
+      "id": "github-copilot",
+      "providerId": "copilot",
+      "name": "GitHub Copilot",
+      "kind": "subscription",
+      "color": "#24292f",
+      "providerAliases": ["copilot", "github"],
+      "tiers": [
+        { "id": "pro", "name": "Copilot Pro", "priceUsd": 10 },
+        { "id": "proplus", "name": "Copilot Pro+", "priceUsd": 39 }
+      ],
+      "limits": [
+        { "externalKey": "monthly", "unit": "percent", "valueMode": "dynamic", "windowKind": "billing", "windowSeconds": null }
+      ],
+      "notes": "Calendar-month AI credits reset on the 1st (UTC), not the billing date; premium requests use model multipliers."
+    },
+    {
+      "id": "cursor",
+      "providerId": "cursor",
+      "name": "Cursor",
+      "kind": "subscription",
+      "color": "#111827",
+      "providerAliases": ["cursor"],
+      "tiers": [
+        { "id": "pro", "name": "Pro", "priceUsd": 20 },
+        { "id": "business", "name": "Business", "priceUsd": 40 }
+      ],
+      "limits": [
+        { "externalKey": "cursor-models", "unit": "percent", "valueMode": "dynamic", "windowKind": "billing", "windowSeconds": null },
+        { "externalKey": "other-models", "unit": "percent", "valueMode": "dynamic", "windowKind": "billing", "windowSeconds": null }
+      ],
+      "notes": "Two monthly pools (Cursor models vs other models) reset with the billing cycle; overage is a separate on-demand pool."
+    },
+    {
+      "id": "aliyun-bailian-coding-plan",
+      "providerId": "aliyun",
+      "name": "阿里云百炼 Coding Plan",
+      "kind": "subscription",
+      "color": "#ff6a00",
+      "providerAliases": ["aliyun", "bailian", "dashscope"],
+      "tiers": [
+        { "id": "pro", "name": "Pro", "priceUsd": null, "limitValues": { "5h": 6000, "weekly": 45000, "monthly": 90000 } }
+      ],
+      "limits": [
+        { "externalKey": "5h", "unit": "requests", "valueMode": "exact", "windowKind": "rolling", "windowSeconds": 18000 },
+        { "externalKey": "weekly", "unit": "requests", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 604800 },
+        { "externalKey": "monthly", "unit": "requests", "valueMode": "exact", "windowKind": "billing", "windowSeconds": null }
+      ],
+      "notes": "Three simultaneous AND caps in model requests; hitting any one stops usage. Weekly resets Monday 00:00 UTC+8."
+    },
+    {
+      "id": "kiro",
+      "providerId": "kiro",
+      "name": "Kiro",
+      "kind": "subscription",
+      "color": "#00b884",
+      "providerAliases": ["kiro"],
+      "tiers": [
+        { "id": "pro", "name": "Pro", "priceUsd": 20 }
+      ],
+      "limits": [
+        { "externalKey": "monthly", "unit": "percent", "valueMode": "dynamic", "windowKind": "billing", "windowSeconds": null }
+      ],
+      "notes": "Monthly credits with model multipliers; add-on credits are a separate wallet."
+    },
+    {
+      "id": "openrouter-wallet",
+      "providerId": "openrouter",
+      "name": "OpenRouter",
+      "kind": "prepaid",
+      "color": "#8a93a3",
+      "providerAliases": ["openrouter"],
+      "tiers": [],
+      "limits": [],
+      "notes": "Prepaid USD credits; per-model inference pricing with credit fees. Balance and expiry are manual entries until an official balance API is wired."
+    },
+    {
+      "id": "siliconflow-wallet",
+      "providerId": "siliconflow",
+      "name": "SiliconFlow",
+      "kind": "prepaid",
+      "color": "#5865f2",
+      "providerAliases": ["siliconflow", "silicon-flow"],
+      "tiers": [],
+      "limits": [],
+      "notes": "RMB prepaid balance plus赠送 balance; official user-info API can carry the balance later."
+    },
+    {
+      "id": "302ai-wallet",
+      "providerId": "302ai",
+      "name": "302.AI",
+      "kind": "prepaid",
+      "color": "#00948f",
+      "providerAliases": ["302ai", "302"],
+      "tiers": [],
+      "limits": [],
+      "notes": "Pure pay-as-you-go wallet; balance is permanent per the official help pages."
+    },
+    {
+      "id": "aihubmix-wallet",
+      "providerId": "aihubmix",
+      "name": "AIHubMix",
+      "kind": "prepaid",
+      "color": "#f59e0b",
+      "providerAliases": ["aihubmix"],
+      "tiers": [],
+      "limits": [],
+      "notes": "PAYG quota/balance wallet; per-key quota and expiry can differ from the account balance."
+    },
+    {
+      "id": "ollama-cloud",
+      "providerId": "ollama-cloud",
+      "name": "Ollama Cloud",
+      "kind": "prepaid",
+      "color": "#0f172a",
+      "providerAliases": ["ollama-cloud", "ollama"],
+      "tiers": [],
+      "limits": [],
+      "notes": "API-key pay-as-you-go usage; remote allowance is not applicable. Usage percentages only with the explicit cookie-scraping opt-in."
+    },
+    {
+      "id": "ollama-local",
+      "providerId": "ollama-local",
+      "name": "Ollama Local",
+      "kind": "track_only",
+      "color": "#475569",
+      "providerAliases": ["ollama-local"],
+      "tiers": [],
+      "limits": [],
+      "notes": "Local runtime, no quota; tracked for local usage only."
+    },
+    {
+      "id": "custom",
+      "providerId": "manual",
+      "name": "自定义",
+      "kind": "track_only",
+      "color": null,
+      "providerAliases": [],
+      "tiers": [],
+      "limits": [],
+      "notes": "Fully manual account; add quota windows, price, balance and attribution rules in the advanced editor."
+    }
+  ]
+}

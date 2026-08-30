@@ -453,24 +453,30 @@ test('plans attribute requests to pools with objective cycle math and rates', ()
       now,
     })
     assert.equal(result.pools.configured, true)
-    const openaiPool = result.pools.pools.find((pool) => pool.id === openai.id)
-    const relayPool = result.pools.pools.find((pool) => pool.id === relay.id)
-    assert.equal(openaiPool.kind, 'sub')
+    // Legacy plans flow through the v5 → account projection: pool ids are the
+    // projected product ids.
+    const poolId = (plan) => `legacy-plan:${plan.id}`
+    const openaiPool = result.pools.pools.find((pool) => pool.id === poolId(openai))
+    const relayPool = result.pools.pools.find((pool) => pool.id === poolId(relay))
+    assert.equal(openaiPool.kind, 'subscription')
+    assert.equal(openaiPool.sourceKind, 'legacy_v5_manual')
     assert.equal(openaiPool.kpis.newComputeTokens, 400)
     assert.equal(openaiPool.usedPct, 40)
+    const openaiWindow = openaiPool.quotaWindows.find((entry) => entry.externalKey === 'primary')
+    assert.equal(openaiWindow.usedPct, 40)
     // Cycle started 2026-08-01; the two sample days fall inside the last 7 days.
-    assert.equal(openaiPool.ratePerDay > 0, true)
-    assert.equal(openaiPool.leftoverAtReset > 0, true)
-    assert.equal(relayPool.kind, 'credit')
+    assert.equal(openaiPool.pace.ratePerDay > 0, true)
+    assert.equal(openaiWindow.leftoverAtReset > 0, true)
+    assert.equal(relayPool.kind, 'prepaid')
     assert.equal(relayPool.balanceUsd, 21.3)
     assert.equal(relayPool.leftoverAtExpiryUsd > 0, true)
     // glm traffic did not match any rule → unassigned bucket over the last 30 days.
     assert.equal(result.pools.unassigned.newComputeTokens, 750)
-    assert.equal(result.pools.tightestPoolId, openai.id)
+    assert.equal(result.pools.tightestPoolId, poolId(openai))
 
     // seriesBy matrix: day keys with per-pool cells, plus the unassigned group.
     const groups = result.seriesBy.groups.map((group) => group.id)
-    assert.equal(groups.includes(openai.id), true)
+    assert.equal(groups.includes(poolId(openai)), true)
     assert.equal(groups.includes('unassigned'), true)
     const totalProcessing = result.seriesBy.days.reduce((sum, day) =>
       sum + Object.values(day.groups).reduce((inner, cell) => inner + cell.processingTokens, 0), 0)
@@ -487,19 +493,19 @@ test('plans attribute requests to pools with objective cycle math and rates', ()
     // Pool dimension ranking and pool filters narrow consistently.
     const poolRank = service.query({ filter: { timezone: 'UTC', time: { fromMs: now - 3 * DAY, toMs: now } }, views: ['rankings'], ranking: { dimension: 'pool', by: 'newComputeTokens' }, now })
     assert.equal(poolRank.rankings.rows.some((row) => row.key === 'unassigned'), true)
-    const narrowed = service.query({ filter: { timezone: 'UTC', time: { fromMs: now - 3 * DAY, toMs: now }, pool: [openai.id] }, views: ['kpis'], now })
+    const narrowed = service.query({ filter: { timezone: 'UTC', time: { fromMs: now - 3 * DAY, toMs: now }, pool: [poolId(openai)] }, views: ['kpis'], now })
     assert.equal(narrowed.kpis.newComputeTokens, 400)
 
     // Rule changes re-attribute on the next revision without touching history.
     service.savePlanRules(openai.id, [{ matchProvider: 'openai*', priority: 0 }, { matchModel: 'grok*', priority: 1 }])
     const after = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
-    const relayAfter = after.pools.pools.find((pool) => pool.id === relay.id)
+    const relayAfter = after.pools.pools.find((pool) => pool.id === poolId(relay))
     // openai* still wins for relay-grok by priority 0, so relay keeps its request.
     assert.equal(relayAfter.kpis.newComputeTokens, 50)
 
     const summary = service.entrySummary({ now, timezone: 'UTC' })
     assert.equal(summary.configured, true)
-    assert.equal(summary.tightest.id, openai.id)
+    assert.equal(summary.tightest.id, poolId(openai))
     assert.equal(typeof summary.month.daysLeft, 'number')
   } finally {
     service.dispose()
@@ -548,10 +554,187 @@ test('rolling 5-hour windows ignore usage older than five hours', () => {
     service.importSession(session({ id: 'fresh', cwd: '/w/a', time: now - 1 * 3_600_000, provider: 'openai-codex', model: 'gpt', input: 100, output: 0, cache: 0 }))
     const result = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
     const pool = result.pools.pools[0]
-    assert.equal(pool.windowKind, '5h')
-    assert.equal(pool.kpis.newComputeTokens, 100)
+    const window = pool.quotaWindows.find((entry) => entry.externalKey === 'primary')
+    assert.equal(window.windowKind, 'rolling')
+    assert.equal(window.windowSeconds, 18000)
+    // Only the fresh sample lands inside the rolling window; the 30-day kpis
+    // still see both.
+    assert.equal(window.used, 100)
+    assert.equal(window.usedPct, 10)
     assert.equal(pool.usedPct, 10)
-    assert.equal(pool.leftoverAtReset, null)
+    assert.equal(pool.kpis.newComputeTokens, 900)
+    assert.equal(window.leftoverAtReset, null)
+  } finally {
+    service.dispose()
+  }
+})
+
+test('zero-config connection accounts attribute local usage and respect archives', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const now = Date.UTC(2026, 7, 30, 12)
+    service.importSession(session({ id: 'c1', cwd: '/w/a', time: now - DAY, provider: 'openai-codex', model: 'gpt-5.6', input: 300, output: 100 }))
+    service.importSession(session({ id: 'c2', cwd: '/w/a', time: now - DAY, provider: 'zai-coding-cn', model: 'glm-5.3', input: 50, output: 50 }))
+
+    // A configured connection becomes an account with default rules, once.
+    const ensured = service.ensureConnectionAccount(
+      { providerId: 'openai-codex', displayName: 'ChatGPT Plus/Pro', configured: true },
+      { aliases: ['openai-codex', 'openai'] },
+    )
+    assert.equal(ensured.archived, false)
+    const again = service.ensureConnectionAccount(
+      { providerId: 'openai-codex', displayName: 'ChatGPT Plus/Pro', configured: true },
+      { aliases: ['openai-codex', 'openai'] },
+    )
+    assert.equal(again.id, ensured.id)
+
+    const pools = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    assert.equal(pools.pools.configured, true)
+    const codex = pools.pools.pools.find((pool) => pool.id === ensured.id)
+    assert.equal(codex.kind, 'track_only')
+    assert.equal(codex.sourceKind, 'connection')
+    assert.equal(codex.kpis.newComputeTokens, 400)
+    assert.equal(pools.pools.unassigned.newComputeTokens, 100)
+
+    // Archive: the connection account disappears and is never resurrected.
+    service.archiveAccount(ensured.id, { archived: true })
+    const revived = service.ensureConnectionAccount(
+      { providerId: 'openai-codex', displayName: 'ChatGPT Plus/Pro', configured: true },
+      { aliases: ['openai-codex', 'openai'] },
+    )
+    assert.equal(revived.archived, true)
+    const afterArchive = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    assert.equal(afterArchive.pools.pools.some((pool) => pool.id === ensured.id), false)
+    assert.equal(afterArchive.pools.unassigned.newComputeTokens, 500)
+
+    // The default rules carry the connection_default source kind.
+    const accounts = service.listAccounts()
+    const account = accounts.find((entry) => entry.id === ensured.id)
+    assert.equal(account.archived, true)
+    assert.ok(account.rules.every((rule) => rule.sourceKind === 'connection_default'))
+  } finally {
+    service.dispose()
+  }
+})
+
+test('saveAccount creates template accounts with limits, rules and official-window merging', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const now = Date.UTC(2026, 7, 30, 12)
+    service.importSession(session({ id: 'g1', cwd: '/w/a', time: now - 2 * 3_600_000, provider: 'zai-coding-cn', model: 'glm-5.3', input: 600, output: 200 }))
+    service.importSession(session({ id: 'g2', cwd: '/w/a', time: now - 10 * DAY, provider: 'zai-coding-cn', model: 'glm-5.3', input: 100, output: 100 }))
+
+    const created = service.saveAccount({
+      name: 'GLM Coding Plan Pro',
+      kind: 'subscription',
+      templateId: 'glm-coding-plan',
+      tierId: 'pro',
+      providerId: 'glm',
+      billing: { priceUsd: 14, resetDay: 12 },
+      limits: [
+        { externalKey: 'primary', unit: 'credits', valueMode: 'exact', value: 12000, windowKind: 'rolling', windowSeconds: 18000 },
+        { externalKey: 'weekly', unit: 'credits', valueMode: 'exact', value: 60000, windowKind: 'fixed', windowSeconds: 604800 },
+      ],
+      rules: [{ matchProvider: 'zai-coding-cn*', priority: 0 }],
+    })
+    assert.ok(created.id.startsWith('account:'))
+
+    // Credits are plan units, not ledger tokens: no local percent math.
+    const pools = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    const account = pools.pools.pools.find((pool) => pool.id === created.id)
+    assert.equal(account.kind, 'subscription')
+    assert.equal(account.kpis.newComputeTokens, 1000)
+    assert.equal(account.quotaWindows.length, 2)
+    assert.equal(account.quotaWindows.every((entry) => entry.usedPct === null), true)
+    assert.equal(account.usedPct, null)
+
+    // An official observation on the same connection drives the percent.
+    const observedAt = now - 60_000
+    service.saveAccountObservation({
+      id: `glm:usage:${observedAt}`, providerId: 'glm', connectionId: 'glm', observedAt,
+      source: 'official_plugin_internal_api', brittle: false, complete: true, quotaApplicable: true,
+      windows: [
+        { id: 'glm-window:5h', kind: 'rolling', label: 'Token usage(5 Hour)', durationMs: 18_000_000, resetsAt: now + 3_600_000 },
+        { id: 'glm-window:month', kind: 'billing', label: 'MCP usage(1 Month)', resetsAt: null },
+      ],
+      limits: [
+        { id: 'glm-limit:5h', windowId: 'glm-window:5h', metric: 'TOKENS_LIMIT', unit: 'percent', mode: 'dynamic', percentUsed: 42, observedAt },
+        { id: 'glm-limit:month', windowId: 'glm-window:month', metric: 'TIME_LIMIT', unit: 'percent', mode: 'dynamic', percentUsed: 7, observedAt },
+      ],
+      warnings: [], metadata: null,
+    })
+    // Bind the account to the observed connection and re-query.
+    service.saveAccount({
+      id: created.id, name: 'GLM Coding Plan Pro', kind: 'subscription', templateId: 'glm-coding-plan', tierId: 'pro', providerId: 'glm',
+      connectionId: 'glm', billing: { priceUsd: 14, resetDay: 12 },
+      limits: [
+        { externalKey: 'primary', unit: 'credits', valueMode: 'exact', value: 12000, windowKind: 'rolling', windowSeconds: 18000 },
+        { externalKey: 'weekly', unit: 'credits', valueMode: 'exact', value: 60000, windowKind: 'fixed', windowSeconds: 604800 },
+      ],
+      rules: [{ matchProvider: 'zai-coding-cn*', priority: 0 }],
+    })
+    const merged = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    const enriched = merged.pools.pools.find((pool) => pool.id === created.id)
+    assert.equal(enriched.official.windows.length, 2)
+    assert.equal(enriched.official.sourceKind, 'official_plugin_internal_api')
+    assert.equal(enriched.officialUsedPct, 42)
+    assert.equal(enriched.usedPct, 42)
+    assert.equal(merged.pools.tightestPoolId, created.id)
+
+    const summary = service.entrySummary({ now, timezone: 'UTC' })
+    assert.equal(summary.tightest.id, created.id)
+    assert.equal(summary.tightest.usedPct, 42)
+    assert.equal(summary.tightest.sourceKind, 'official_plugin_internal_api')
+    assert.equal(summary.tightest.windowLabel, 'Token usage(5 Hour)')
+    assert.equal(summary.tightest.resetsAt, now + 3_600_000)
+
+    // inspect carries the account identity, declared limits, rules and trend.
+    const detail = service.inspect({ kind: 'pool', id: created.id, filter: { timezone: 'UTC' } })
+    assert.equal(detail.identity.name, 'GLM Coding Plan Pro')
+    assert.equal(detail.identity.rules.length, 1)
+    assert.equal(detail.identity.declaredLimits.length, 2)
+    assert.equal(detail.account.officialUsedPct, 42)
+    assert.equal(detail.direct.processingTokens, 1400)
+    assert.ok(detail.trend.buckets.length > 0)
+    assert.equal(detail.page.rows.length, 2)
+
+    // Validation and archive round-trip.
+    assert.throws(() => service.saveAccount({ name: '' }), /account name is required/)
+    assert.throws(() => service.saveAccount({ name: 'x', kind: 'wallet' }), /invalid account kind/)
+    assert.throws(() => service.saveAccount({ name: 'x', limits: [{ externalKey: 'a', unit: 'percent', valueMode: 'manual' }] }), /manual limits require a positive value/)
+    assert.throws(() => service.saveAccount({ name: 'x', rules: [{}] }), /matchProvider or matchModel is required/)
+    service.archiveAccount(created.id, { archived: true })
+    const archivedPools = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    assert.equal(archivedPools.pools.pools.some((pool) => pool.id === created.id), false)
+    service.archiveAccount(created.id, { archived: false })
+    assert.equal(service.listAccounts().find((entry) => entry.id === created.id).archived, false)
+  } finally {
+    service.dispose()
+  }
+})
+
+test('legacy v5 plans created after the flip stay projected and read-only in the account editor', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const now = Date.UTC(2026, 7, 30, 12)
+    const plan = service.savePlan({ kind: 'sub', name: 'Old pool', quotaUnit: 'newCompute', quotaValue: 500, windowKind: '5h' })
+    service.savePlanRules(plan.id, [{ matchProvider: 'deepseek*' }])
+    service.importSession(session({ id: 'l1', cwd: '/w/a', time: now - 3_600_000, provider: 'deepseek', model: 'deepseek-chat', input: 100, output: 100 }))
+
+    const pools = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    const projected = pools.pools.pools.find((pool) => pool.id === `legacy-plan:${plan.id}`)
+    assert.equal(projected.kpis.newComputeTokens, 200)
+    assert.equal(projected.quotaWindows[0].usedPct, 40)
+
+    // The account editor refuses to mutate a projected legacy product.
+    assert.throws(() => service.saveAccount({ id: `legacy-plan:${plan.id}`, name: 'hijack' }), /legacy v5 plans are read-only/)
+
+    // Archiving through the account editor archives the plan and vice versa.
+    service.archiveAccount(`legacy-plan:${plan.id}`, { archived: true })
+    assert.equal(service.listPlans().find((entry) => entry.id === plan.id).archived, true)
+    const afterArchive = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    assert.equal(afterArchive.pools.pools.length, 0)
+    assert.equal(afterArchive.pools.unassigned.newComputeTokens, 200)
   } finally {
     service.dispose()
   }

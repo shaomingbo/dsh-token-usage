@@ -346,3 +346,71 @@ test('apply imports history, serves the loopback channel, and folds live events'
     delete process.env.DSH_HOME
   }
 })
+
+test('account wizard endpoints serve templates, suggestions and persistence without secrets', async () => {
+  const env = tempHome()
+  process.env.DSH_HOME = env.home
+  try {
+    const { ctx, channels } = fakeCtx()
+    apply(ctx, { providerProxy: false })
+    await settle()
+    const accountChannel = channels.get('/account-usage')
+    const tokenChannel = channels.get('/token-usage')
+
+    // Templates come from the seeded host-side catalog.
+    const templates = await accountChannel.handler('templates', {})
+    assert.equal(templates.ok, true)
+    assert.ok(templates.value.templates.some((template) => template.id === 'glm-coding-plan'))
+    assert.ok(templates.value.templates.some((template) => template.id === 'chatgpt-codex'))
+
+    // Zero-config: summary auto-creates an account for the always-configured
+    // local runtime connection.
+    await accountChannel.handler('summary', {})
+    const accounts = await accountChannel.handler('accounts', {})
+    const auto = accounts.value.accounts.find((account) => account.id === 'connection:ollama-local:default')
+    assert.ok(auto, 'auto account for ollama-local missing')
+    assert.equal(auto.sourceKind, 'connection')
+    assert.ok(auto.rules.some((rule) => rule.matchProvider === 'ollama-local*'))
+
+    // Suggestions join observed ledger traffic against templates: the
+    // synthetic deepseek traffic has no template, so a custom suggestion
+    // carries the provider evidence.
+    const suggestions = await accountChannel.handler('suggest-accounts', {})
+    const custom = suggestions.value.suggestions.find((entry) => entry.kind === 'custom')
+    assert.ok(custom, 'custom suggestion missing')
+    assert.ok(custom.evidence.providers.some((provider) => provider.provider === 'deepseek'))
+    assert.ok(custom.suggestedRules.some((rule) => rule.matchProvider === 'deepseek*'))
+
+    // Saving an account from the suggestion attributes local usage.
+    const created = await accountChannel.handler('save-account', {
+      account: { name: 'DeepSeek API', kind: 'prepaid', rules: custom.suggestedRules, billing: { balanceUsd: 5 } },
+    })
+    assert.equal(created.ok, true)
+    const account = (await accountChannel.handler('accounts', {})).value.accounts.find((entry) => entry.id === created.value.id)
+    assert.equal(account.billing.kind, 'prepaid')
+    assert.equal(Number(account.billing.balanceNano) / 1e9, 5)
+    const scoped = await tokenChannel.handler('query', {
+      filter: { timezone: 'UTC', time: { preset: 'all' }, pool: [created.value.id] },
+      views: ['kpis'],
+    })
+    assert.equal(scoped.value.kpis.requests, 1)
+
+    // Archive restores the unassigned evidence without losing history.
+    const archived = await accountChannel.handler('archive-account', { id: created.value.id })
+    assert.equal(archived.ok, true)
+    const after = await tokenChannel.handler('query', {
+      filter: { timezone: 'UTC', time: { preset: 'all' }, pool: ['unassigned'] },
+      views: ['kpis'],
+    })
+    assert.equal(after.value.kpis.requests, 1)
+
+    // Unknown endpoints and bad payloads fail with schema-legal envelopes.
+    assert.equal((await accountChannel.handler('bogus', {})).ok, false)
+    const invalid = await accountChannel.handler('save-account', { account: { name: '' } })
+    assert.equal(invalid.ok, false)
+    assert.equal(invalid.error.code, 'invalid-account')
+  } finally {
+    env.cleanup()
+    delete process.env.DSH_HOME
+  }
+})
