@@ -1,6 +1,6 @@
 {
   "name": "dsh-token-usage",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "DSH Accounts & Usage: unified provider connections, official allowance observations, and a separate local usage ledger. No telemetry, prompts, or secrets in SQLite/RPC/log/export.",
   "type": "module",
   "main": "lib/index.js",

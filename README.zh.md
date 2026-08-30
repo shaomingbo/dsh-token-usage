@@ -1,28 +1,28 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 4.0.0 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
+`dsh-token-usage` 4.0.1 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
 
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v4.0.0
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 status
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --profile web --source github:shaomingbo/dsh-token-usage#v4.0.1
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到 `v4.0.0` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
+`--profile` 默认是 `web`；`--source` 默认固定到 `v4.0.1` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
 
 ### 本地开发
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --source link:$PWD
 ```
 
 安装器只原子修改 `dependencies["dsh-token-usage"]` 和 `dsh.profile.bundles`，执行 `pnpm install --ignore-scripts`（含 corepack 回退），失败时恢复 manifest。手工修改同样两个字段仅作为兜底。

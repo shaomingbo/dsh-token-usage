@@ -1,28 +1,28 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 4.0.0 keeps the package name and existing local ledger while adding one place to connect provider accounts and compare provider observations with DSH-observed usage. No telemetry, prompt storage, or DSH source patches.
+`dsh-token-usage` 4.0.1 keeps the package name and existing local ledger while adding one place to connect provider accounts and compare provider observations with DSH-observed usage. No telemetry, prompt storage, or DSH source patches.
 
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --profile web --source github:shaomingbo/dsh-token-usage#v4.0.0
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 status
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --profile web --source github:shaomingbo/dsh-token-usage#v4.0.1
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the fixed `v4.0.0` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
+`--profile` defaults to `web`. `--source` defaults to the fixed `v4.0.1` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
 
 ### Local development
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v4.0.0 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v4.0.1 --source link:$PWD
 ```
 
 The installer atomically changes only `dependencies["dsh-token-usage"]` and `dsh.profile.bundles`, runs `pnpm install --ignore-scripts` (with the documented corepack fallback), and restores the manifest if installation fails. Manual editing of those same two fields is a fallback, not the preferred installation path.
