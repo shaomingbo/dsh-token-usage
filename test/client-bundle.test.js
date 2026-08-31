@@ -112,7 +112,10 @@ test('v5 account lifecycle: entry, dock, overview and per-account insight over t
 
 test('client uses host theme variables and never talks to the network directly', () => {
   assert.match(source, /var\(--dsw-/)
-  assert.ok(!/https?:\/\//.test(source), 'no hardcoded remote URLs')
+  // One allowlisted display link for the Ollama cookie guide; no other remote
+  // URLs, and no direct fetching.
+  const remoteUrls = [...source.matchAll(/https?:\/\/[^'"`\s)]+/g)].map((match) => match[0])
+  assert.deepEqual([...new Set(remoteUrls)], ['https://ollama.com/settings'])
   assert.ok(!/fetch\(/.test(source), 'client never fetches directly; it uses the loopback channel')
 })
 
