@@ -626,6 +626,27 @@ test('zero-config connection accounts attribute local usage and respect archives
   }
 })
 
+test('saving a GLM adapter observation without registry providerId does not throw ERR_INVALID_ARG_TYPE', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const now = Date.UTC(2026, 7, 30, 12)
+    const saved = service.saveAccountObservation({
+      id: `glm:glm:default:${now}`,
+      connectionId: 'glm:default',
+      observedAt: now,
+      source: 'official_plugin_internal_api',
+      brittle: true,
+      complete: false,
+      windows: [],
+      limits: [],
+      warnings: ['No quota entries were published'],
+    })
+    assert.equal(saved.connectionId, 'glm:default')
+  } finally {
+    service.dispose()
+  }
+})
+
 test('a later empty official_response does not hide an earlier official_ui observation', () => {
   // Connection accounts are keyed `provider:default`; adapter scrapes historically
   // stored `provider`. Both must join, and an API-key probe with no windows

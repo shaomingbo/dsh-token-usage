@@ -133,6 +133,7 @@ test('GLM uses raw Authorization, redirect:error, confined origin, and partial q
   assert.equal(result.limits[0].mode, 'exact')
   assert.equal(result.limits[0].used, 250)
   assert.equal(result.windows[0].durationMs, 5 * 3_600_000)
+  assert.equal(result.windows[0].label, '5小时')
   assert.equal(result.complete, false)
   assert.equal(result.source, 'official_plugin_internal_api')
   assert.equal(result.brittle, true)
@@ -170,6 +171,32 @@ test('GLM queries official model/tool usage with the official local-time range',
   }
   assert.deepEqual(result.metadata.usage.model, { records: 1, collections: ['rows'] })
   assert.deepEqual(result.metadata.usage.tool, { records: 1, collections: ['rows'] })
+})
+
+test('GLM maps TOKENS_LIMIT to the 5-hour window and TIME_LIMIT to MCP, 5-hour first', async () => {
+  const adapter = new GlmAdapter({
+    endpoint: 'https://open.bigmodel.cn/api/monitor/usage/quota/limit',
+    fetch: async () => response({
+      status: 200,
+      url: 'https://open.bigmodel.cn/api/monitor/usage/quota/limit',
+      json: {
+        code: 200,
+        data: {
+          limits: [
+            { type: 'TIME_LIMIT', percentage: 40, nextResetTime: NOW + 28 * 86_400_000 },
+            { type: 'TOKENS_LIMIT', percentage: 31, nextResetTime: NOW + 3_600_000 },
+          ],
+        },
+      },
+    }),
+  })
+  const result = await adapter.observe({ credential: { secret: 'raw-token' }, now: () => NOW })
+  assert.equal(result.windows[0].label, '5小时')
+  assert.equal(result.windows[0].kind, 'rolling')
+  assert.equal(result.windows[0].durationMs, 5 * 3_600_000)
+  assert.equal(result.windows[1].label, 'MCP')
+  assert.equal(result.windows[1].kind, 'billing')
+  assert.deepEqual(result.limits.map((limit) => limit.percentUsed), [31, 40])
 })
 
 test('GLM treats HTTP-200 unsuccessful JSON envelopes as safe errors', async () => {
