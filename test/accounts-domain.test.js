@@ -284,7 +284,7 @@ test('manual Ollama Cookie Header scraping is opt-in, allowlisted, confined, bri
     now: () => NOW,
   })
   assert.equal(calls[0].url, 'https://ollama.com/settings')
-  assert.equal(calls[0].init.redirect, 'error')
+  assert.equal(calls[0].init.redirect, 'manual')
   assert.equal(calls[0].init.headers.Cookie, 'better-auth.session_token=session-secret')
   assert.equal(result.source, 'official_ui')
   assert.equal(result.brittle, true)
@@ -294,6 +294,19 @@ test('manual Ollama Cookie Header scraping is opt-in, allowlisted, confined, bri
   assert.equal(result.limits[0].percentUsed, 37)
   assert.match(result.warnings[0], /Weekly quota/)
   assert.equal(JSON.stringify(result).includes('session-secret'), false)
+})
+
+test('an Ollama settings redirect is diagnosed as an invalid or expired session cookie, never followed', async () => {
+  const adapter = new OllamaCloudAdapter({
+    enableManualCookieScraping: true,
+    fetch: async () => response({ status: 303, url: 'https://ollama.com/signin', text: '' }),
+  })
+  await assert.rejects(adapter.observe({
+    connection: { id: 'cloud' },
+    credential: { kind: 'manual_cookie_header', cookieHeader: 'session=stale-value' },
+    manualCookieOptIn: true,
+    now: () => NOW,
+  }), (error) => error.code === 'session-invalid-or-expired')
 })
 
 test('account storage helper round-trips canonical records through the parent v6 schema', () => {
