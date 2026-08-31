@@ -278,8 +278,10 @@ test('v5 components render against a mocked host without throwing', async () => 
   await new Promise((resolvePromise) => { setTimeout(resolvePromise, 30) })
 })
 
-test('credential writes use the public RpcRequest envelope and value-free confirmation', () => {
-  assert.match(source, /credentials\.set\(credentialRequest\(\{ ref, value \}\)\)/)
-  assert.match(source, /credentials\.describe\(credentialRequest\(\{ refs: \[ref\] \}\)\)/)
+test('credential writes mirror the DSH Web high-level facade contract', () => {
+  assert.match(source, /credentials\.set\(\{ ref, value \}\)/)
+  assert.match(source, /credentials\.describe\(\{ refs: \[ref\] \}\)/)
+  assert.match(source, /response\?\.result\?\.ok/)
   assert.match(source, /describe\.result\.value\.credentials/)
+  assert.ok(!source.includes('credentialRequest('), 'the facade must not receive a nested RpcRequest')
 })
