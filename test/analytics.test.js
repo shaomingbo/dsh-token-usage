@@ -626,6 +626,51 @@ test('zero-config connection accounts attribute local usage and respect archives
   }
 })
 
+test('a later empty official_response does not hide an earlier official_ui observation', () => {
+  // Connection accounts are keyed `provider:default`; adapter scrapes historically
+  // stored `provider`. Both must join, and an API-key probe with no windows
+  // must not hide Session usage 0%.
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const now = Date.UTC(2026, 7, 30, 12)
+    const account = service.ensureConnectionAccount(
+      { providerId: 'ollama-cloud', displayName: 'Ollama Cloud', configured: true },
+      { aliases: ['ollama-cloud', 'ollama'] },
+    )
+    service.saveAccountObservation({
+      id: `ollama-cloud-ui:${now - 60_000}`, providerId: 'ollama-cloud', connectionId: 'ollama-cloud',
+      observedAt: now - 60_000, source: 'official_ui', brittle: true, complete: true, quotaApplicable: true,
+      windows: [
+        { id: 'ollama-cloud-window:session-hourly', kind: 'rate', label: 'Session usage', durationMs: 18_000_000, resetsAt: now + 5 * 3_600_000 },
+        { id: 'ollama-cloud-window:weekly', kind: 'rolling', label: 'Weekly', durationMs: 604_800_000, resetsAt: now + 6 * DAY },
+      ],
+      limits: [
+        { id: 'ollama-cloud-limit:session-hourly', windowId: 'ollama-cloud-window:session-hourly', metric: 'cloud_usage', unit: 'percent', mode: 'dynamic', percentUsed: 0, observedAt: now - 60_000 },
+        { id: 'ollama-cloud-limit:weekly', windowId: 'ollama-cloud-window:weekly', metric: 'cloud_usage', unit: 'percent', mode: 'dynamic', percentUsed: 32.7, observedAt: now - 60_000 },
+      ],
+      warnings: [], metadata: null,
+    })
+    service.saveAccountObservation({
+      id: `ollama-cloud:${now}`, providerId: 'ollama-cloud', connectionId: 'ollama-cloud',
+      observedAt: now, source: 'official_response', brittle: false, complete: false, quotaApplicable: true,
+      windows: [], limits: [],
+      warnings: ['Quota limits were not published by this response'], metadata: { credentialStatus: 'unverified' },
+    })
+    const pools = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    const cloud = pools.pools.pools.find((pool) => pool.id === account.id)
+    assert.equal(cloud.official.sourceKind, 'official_ui')
+    assert.deepEqual(cloud.official.windows.map((window) => [window.label, window.percentUsed]), [
+      ['Session usage', 0],
+      ['Weekly', 32.7],
+    ])
+    const detail = service.inspect({ kind: 'pool', id: account.id, filter: { timezone: 'UTC' } })
+    assert.equal(detail.account.official.windows.length, 2)
+    assert.equal(detail.account.official.windows[0].percentUsed, 0)
+  } finally {
+    service.dispose()
+  }
+})
+
 test('saveAccount creates template accounts with limits, rules and official-window merging', () => {
   const service = createLedgerService({ databasePath: ':memory:' })
   try {

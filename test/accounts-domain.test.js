@@ -239,6 +239,28 @@ test('Ollama settings parser tolerates complete hourly and weekly fields', () =>
   assert.deepEqual(parsed.warnings, [])
 })
 
+test('Ollama settings parser reads live Session usage 0% and relative reset copy', () => {
+  const parsed = parseOllamaSettings(`
+    <h2>Cloud usage Pro</h2>
+    <p>Cloud models and capabilities such as web search contribute to session and weekly limits.</p>
+    <span>Session usage</span><span>0% used</span>
+    <div aria-label="Session usage 0% used"></div>
+    <p>Resets in 5 hours.</p>
+    <span>Weekly usage</span><span>32.7% used</span>
+    <div aria-label="Weekly usage 32.7% used"></div>
+    <p>Resets in 6 days.</p>
+  `, { connectionId: 'cloud', observedAt: NOW })
+  assert.equal(parsed.plan, 'Pro')
+  assert.deepEqual(parsed.limits.map((limit) => [limit.id, limit.percentUsed]), [
+    ['ollama-cloud-limit:session-hourly', 0],
+    ['ollama-cloud-limit:weekly', 32.7],
+  ])
+  assert.equal(parsed.windows[0].label, 'Session usage')
+  assert.equal(parsed.windows[0].resetsAt, NOW + 5 * 3_600_000)
+  assert.equal(parsed.windows[1].resetsAt, NOW + 6 * 86_400_000)
+  assert.deepEqual(parsed.warnings, [])
+})
+
 test('Ollama settings parser accepts CodexBar-style Cloud Usage, email, CSS widths, and data-time resets', () => {
   const parsed = parseOllamaSettings(`
     <main><h2>Cloud Usage</h2><div>Pro</div><span id="header-email">person@example.com</span>
@@ -307,6 +329,46 @@ test('an Ollama settings redirect is diagnosed as an invalid or expired session 
     manualCookieOptIn: true,
     now: () => NOW,
   }), (error) => error.code === 'session-invalid-or-expired')
+})
+
+test('a pasted session= cookie is also sent as __Secure-session so ollama.com does not bounce to /signin', async () => {
+  // ollama.com currently authenticates on `__Secure-session`. The UI asks users
+  // to paste the cookie *value*, which the client historically wrapped as
+  // `session=<value>` — a 303 to /signin, reported as "cookie invalid/expired".
+  assert.equal(
+    allowedCookieHeader('session=age-v1-blob-with==padding'),
+    'session=age-v1-blob-with==padding; __Secure-session=age-v1-blob-with==padding',
+  )
+  assert.equal(
+    allowedCookieHeader('__Secure-session=already-secure'),
+    '__Secure-session=already-secure',
+  )
+
+  const calls = []
+  const adapter = new OllamaCloudAdapter({
+    enableManualCookieScraping: true,
+    fetch: async (_url, init) => {
+      calls.push(init.headers.Cookie)
+      const cookie = String(init.headers.Cookie ?? '')
+      const authed = /(?:^|;\s*)__Secure-session=live-session(?:;|$)/.test(cookie)
+      return response({
+        status: authed ? 200 : 303,
+        url: authed ? 'https://ollama.com/settings' : 'https://ollama.com/signin',
+        text: authed
+          ? '<script>window.data={"planName":"Pro","hourlyPercent":4,"hourlyReset":"2027-01-15T12:00:00Z"}</script>'
+          : '',
+      })
+    },
+  })
+  const result = await adapter.observe({
+    connection: { id: 'cloud' },
+    credential: { kind: 'manual_cookie_header', cookieHeader: 'session=live-session' },
+    manualCookieOptIn: true,
+    now: () => NOW,
+  })
+  assert.equal(calls[0], 'session=live-session; __Secure-session=live-session')
+  assert.equal(result.source, 'official_ui')
+  assert.equal(result.product.name, 'Pro')
 })
 
 test('account storage helper round-trips canonical records through the parent v6 schema', () => {

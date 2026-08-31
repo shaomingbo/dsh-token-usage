@@ -79,6 +79,8 @@ test('v5 client keeps provider connections and official observations separate fr
   assert.ok(source.includes("refresh: true"))
   assert.ok(source.includes("OLLAMA_SESSION_COOKIE"))
   assert.ok(source.includes("cookieOptIn"))
+  assert.match(source, /return `__Secure-session=\$\{input\}`/)
+  assert.equal(source.includes('return `session=${input}`'), false)
   assert.ok(source.includes("connection-action"))
   assert.ok(source.includes("'sync-model-catalog'"))
   assert.ok(source.includes('Sync Cloud models'))
