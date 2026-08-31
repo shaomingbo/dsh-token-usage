@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DSH 账户与用量 · 侧栏 Micro Icon 原型选型</title>
+<style>
+  :root {
+    --bg-page: #f6f8fa;
+    --bg-card: #ffffff;
+    --bg-sidebar: #fbfcfd;
+    --border: #e1e4e8;
+    --text-primary: #1f2328;
+    --text-secondary: #656d76;
+    --text-tertiary: #8c959f;
+    --accent: #4176e6;
+    --error: #ec1313;
+    --warning: #d97706;
+    --track: rgba(140, 149, 159, 0.22);
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+
+  [data-theme="dark"] {
+    --bg-page: #0d1117;
+    --bg-card: #161b22;
+    --bg-sidebar: #12161c;
+    --border: #30363d;
+    --text-primary: #f0f6fc;
+    --text-secondary: #8b949e;
+    --text-tertiary: #6e7681;
+    --accent: #58a6ff;
+    --error: #f85149;
+    --warning: #d29922;
+    --track: rgba(110, 118, 129, 0.28);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--bg-page);
+    color: var(--text-primary);
+    padding: 32px 24px 100px;
+    line-height: 1.5;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .header {
+    max-width: 1080px;
+    margin: 0 auto 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .title-group h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .title-group p {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* Control Panel */
+  .toolbar {
+    max-width: 1080px;
+    margin: 0 auto 32px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .control-group label {
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .slider-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  input[type="range"] {
+    width: 140px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .pct-badge {
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 42px;
+    color: var(--accent);
+  }
+  .pct-badge.risk { color: var(--error); }
+  .btn-chip {
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .btn-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* Grid of Prototypes */
+  .grid {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    transition: transform 0.15s, border-color 0.15s;
+  }
+  .card:hover {
+    border-color: var(--accent);
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .card-tag.current {
+    background: rgba(65, 118, 230, 0.12);
+    color: var(--accent);
+    border-color: rgba(65, 118, 230, 0.3);
+  }
+
+  /* Real In-Situ Preview Box */
+  .preview-section {
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .preview-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+  }
+
+  /* Exact DSH Sidebar Button Simulation */
+  .dsh-entry-btn {
+    all: unset;
+    cursor: pointer;
+    box-sizing: border-box;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: transparent;
+    transition: background 0.12s;
+  }
+  .dsh-entry-btn:hover {
+    background: rgba(140, 149, 159, 0.12);
+  }
+  .dsh-entry-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dsh-entry-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .dsh-entry-row1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .dsh-entry-row1-pct {
+    font-size: 11px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+  .dsh-entry-bar-track {
+    height: 3px;
+    width: 100%;
+    border-radius: 2px;
+    background: var(--track);
+    overflow: hidden;
+  }
+  .dsh-entry-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.15s, background-color 0.15s;
+  }
+  .dsh-entry-bar-fill.risk { background: var(--error); }
+  .dsh-entry-caption {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Collapsed Rail Simulation */
+  .collapsed-rail-sim {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(140, 149, 159, 0.06);
+    padding: 8px 12px;
+    border-radius: 8px;
+  }
+  .collapsed-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  /* Zoomed Glyph View */
+  .zoom-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 12px;
+    background: var(--bg-page);
+    border-radius: 8px;
+  }
+  .zoom-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-tertiary);
+  }
+
+  /* Pros / Cons */
+  .traits {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .trait-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .trait-icon { font-size: 13px; line-height: 1.2; flex-shrink: 0; }
+  .trait-text { color: var(--text-secondary); }
+  .trait-text strong { color: var(--text-primary); }
+
+  /* Floating Switcher Bar for Quick Switch */
+  .floating-bar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    z-index: 1000;
+  }
+  .floating-bar span {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title-group">
+    <h1>DSH 账户与用量 · 侧栏 Micro Icon 原型矩阵</h1>
+    <p>16×16 微型槽位适配：拉动滑块实时对比不同水位 (0%~100%) 及折叠态下的视觉表达与辨识度。</p>
+  </div>
+  <button class="btn-chip" id="themeToggle" onclick="toggleTheme()">🌙 切换深色 / 浅色</button>
+</div>
+
+<!-- Controls -->
+<div class="toolbar">
+  <div class="control-group">
+    <label>测试水位：</label>
+    <div class="slider-wrapper">
+      <input type="range" id="pctSlider" min="0" max="100" value="9" oninput="updatePct(this.value)">
+      <span class="pct-badge" id="pctDisplay">9%</span>
+    </div>
+  </div>
+  <div class="control-group">
+    <label>典型场景：</label>
+    <button class="btn-chip active" onclick="setPreset(9)">9% (当前实机)</button>
+    <button class="btn-chip" onclick="setPreset(0)">0% (新周期)</button>
+    <button class="btn-chip" onclick="setPreset(42)">42% (日常)</button>
+    <button class="btn-chip" onclick="setPreset(75)">75% (偏紧)</button>
+    <button class="btn-chip" onclick="setPreset(95)">95% (高危红色)</button>
+    <button class="btn-chip" onclick="setPreset(null)">— (无额度)</button>
+  </div>
+</div>
+
+<!-- Prototype Cards Grid -->
+<div class="grid" id="cardGrid">
+
+  <!-- Variant 1: 半环水位计 (Current) -->
+  <div class="card" data-variant="half-ring">
+    <div class="card-header">
+      <div class="card-title">
+        <span>1. 半环仪表盘</span>
+      </div>
+      <span class="card-tag current">当前落地</span>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
+      <button class="dsh-entry-btn">
+        <div class="dsh-entry-icon" id="icon-half-ring-16"></div>
+        <div class="dsh-entry-content">
+          <div class="dsh-entry-row1">
+            <span>账户与用量</span>
+            <span class="dsh-entry-row1-pct val-pct">9%</span>
+          </div>
+          <div class="dsh-entry-bar-track">
+            <div class="dsh-entry-bar-fill val-bar"></div>
+          </div>
+          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
+      <div class="collapsed-rail-sim">
+        <div class="collapsed-btn" id="icon-half-ring-rail"></div>
+        <span style="font-size: 11px; color: var(--text-secondary);">只剩 36px 按钮时，半环可读水位</span>
+      </div>
+    </div>
+
+    <div class="zoom-box">
+      <div class="zoom-item">
+        <div id="icon-half-ring-zoom16"></div>
+        <span>16×16 原大</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-half-ring-zoom24" style="transform: scale(1.5);"></div>
+        <span>24×24</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-half-ring-zoom32" style="transform: scale(2);"></div>
+        <span>32×32 细节</span>
+      </div>
+    </div>
+
+    <div class="traits">
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>极简留白</strong>：底部开口，线条轻盈，与标题平齐感好。</span></div>
+      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>低水位表现</strong>：在 &lt;10% 时左下角只有很小一段，初看稍显不对称。</span></div>
+    </div>
+  </div>
+
+  <!-- Variant 2: 完整圆环 (Full Ring) -->
+  <div class="card" data-variant="full-ring">
+    <div class="card-header">
+      <div class="card-title">
+        <span>2. 360° 完整圆环</span>
+      </div>
+      <span class="card-tag">经典推荐</span>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
+      <button class="dsh-entry-btn">
+        <div class="dsh-entry-icon" id="icon-full-ring-16"></div>
+        <div class="dsh-entry-content">
+          <div class="dsh-entry-row1">
+            <span>账户与用量</span>
+            <span class="dsh-entry-row1-pct val-pct">9%</span>
+          </div>
+          <div class="dsh-entry-bar-track">
+            <div class="dsh-entry-bar-fill val-bar"></div>
+          </div>
+          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
+      <div class="collapsed-rail-sim">
+        <div class="collapsed-btn" id="icon-full-ring-rail"></div>
+        <span style="font-size: 11px; color: var(--text-secondary);">Apple Watch 健身环风格，闭合圆</span>
+      </div>
+    </div>
+
+    <div class="zoom-box">
+      <div class="zoom-item">
+        <div id="icon-full-ring-zoom16"></div>
+        <span>16×16 原大</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-full-ring-zoom24" style="transform: scale(1.5);"></div>
+        <span>24×24</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-full-ring-zoom32" style="transform: scale(2);"></div>
+        <span>32×32 细节</span>
+      </div>
+    </div>
+
+    <div class="traits">
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>最高对称美感</strong>：12点钟顺时针填充，0%时也是完整轨道圈，永不断线。</span></div>
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>通用心智</strong>：系统托盘/下载进度环标准范式，无理解门槛。</span></div>
+    </div>
+  </div>
+
+  <!-- Variant 3: 能量胶囊 / 电池 (Battery Capsule) -->
+  <div class="card" data-variant="battery">
+    <div class="card-header">
+      <div class="card-title">
+        <span>3. 能量胶囊 / 电池</span>
+      </div>
+      <span class="card-tag">心智最强</span>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
+      <button class="dsh-entry-btn">
+        <div class="dsh-entry-icon" id="icon-battery-16"></div>
+        <div class="dsh-entry-content">
+          <div class="dsh-entry-row1">
+            <span>账户与用量</span>
+            <span class="dsh-entry-row1-pct val-pct">9%</span>
+          </div>
+          <div class="dsh-entry-bar-track">
+            <div class="dsh-entry-bar-fill val-bar"></div>
+          </div>
+          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
+      <div class="collapsed-rail-sim">
+        <div class="collapsed-btn" id="icon-battery-rail"></div>
+        <span style="font-size: 11px; color: var(--text-secondary);">水平胶囊仓，左到右填充</span>
+      </div>
+    </div>
+
+    <div class="zoom-box">
+      <div class="zoom-item">
+        <div id="icon-battery-zoom16"></div>
+        <span>16×16 原大</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-battery-zoom24" style="transform: scale(1.5);"></div>
+        <span>24×24</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-battery-zoom32" style="transform: scale(2);"></div>
+        <span>32×32 细节</span>
+      </div>
+    </div>
+
+    <div class="traits">
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>额度隐喻直接</strong>：一眼即知代表“储量/消耗”。</span></div>
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>横向呼应</strong>：与下方的长条水平 bar 动势完全同向。</span></div>
+    </div>
+  </div>
+
+  <!-- Variant 4: 速度计指针 (Needle Dial) -->
+  <div class="card" data-variant="dial">
+    <div class="card-header">
+      <div class="card-title">
+        <span>4. 机械指针刻度盘</span>
+      </div>
+      <span class="card-tag">硬核仪表</span>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
+      <button class="dsh-entry-btn">
+        <div class="dsh-entry-icon" id="icon-dial-16"></div>
+        <div class="dsh-entry-content">
+          <div class="dsh-entry-row1">
+            <span>账户与用量</span>
+            <span class="dsh-entry-row1-pct val-pct">9%</span>
+          </div>
+          <div class="dsh-entry-bar-track">
+            <div class="dsh-entry-bar-fill val-bar"></div>
+          </div>
+          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
+      <div class="collapsed-rail-sim">
+        <div class="collapsed-btn" id="icon-dial-rail"></div>
+        <span style="font-size: 11px; color: var(--text-secondary);">240° 刻度弧 + 中心转动指针</span>
+      </div>
+    </div>
+
+    <div class="zoom-box">
+      <div class="zoom-item">
+        <div id="icon-dial-zoom16"></div>
+        <span>16×16 原大</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-dial-zoom24" style="transform: scale(1.5);"></div>
+        <span>24×24</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-dial-zoom32" style="transform: scale(2);"></div>
+        <span>32×32 细节</span>
+      </div>
+    </div>
+
+    <div class="traits">
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>小百分比极清晰</strong>：9% 指针清晰指向左下，50% 指正上方，90% 指右下。</span></div>
+      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>细节较密</strong>：指针轴心在 16×16 像素下比较紧凑。</span></div>
+    </div>
+  </div>
+
+  <!-- Variant 5: 4阶梯信号柱 (Stepped Signal Bars) -->
+  <div class="card" data-variant="signal">
+    <div class="card-header">
+      <div class="card-title">
+        <span>5. 阶梯量化柱 (4-Bar)</span>
+      </div>
+      <span class="card-tag">像素级锐利</span>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
+      <button class="dsh-entry-btn">
+        <div class="dsh-entry-icon" id="icon-signal-16"></div>
+        <div class="dsh-entry-content">
+          <div class="dsh-entry-row1">
+            <span>账户与用量</span>
+            <span class="dsh-entry-row1-pct val-pct">9%</span>
+          </div>
+          <div class="dsh-entry-bar-track">
+            <div class="dsh-entry-bar-fill val-bar"></div>
+          </div>
+          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
+      <div class="collapsed-rail-sim">
+        <div class="collapsed-btn" id="icon-signal-rail"></div>
+        <span style="font-size: 11px; color: var(--text-secondary);">4 根离散竖条，按水位逐级亮起</span>
+      </div>
+    </div>
+
+    <div class="zoom-box">
+      <div class="zoom-item">
+        <div id="icon-signal-zoom16"></div>
+        <span>16×16 原大</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-signal-zoom24" style="transform: scale(1.5);"></div>
+        <span>24×24</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-signal-zoom32" style="transform: scale(2);"></div>
+        <span>32×32 细节</span>
+      </div>
+    </div>
+
+    <div class="traits">
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>绝对不糊</strong>：全是垂直矩形，抗锯齿最干净。</span></div>
+      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>离散量化</strong>：4 格代表 25%/50%/75%/100%，9% 时亮 1 格（或空格淡显）。</span></div>
+    </div>
+  </div>
+
+  <!-- Variant 6: 水滴液位 (Liquid Droplet) -->
+  <div class="card" data-variant="droplet">
+    <div class="card-header">
+      <div class="card-title">
+        <span>6. 水位水滴 (Liquid)</span>
+      </div>
+      <span class="card-tag">生动意象</span>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
+      <button class="dsh-entry-btn">
+        <div class="dsh-entry-icon" id="icon-droplet-16"></div>
+        <div class="dsh-entry-content">
+          <div class="dsh-entry-row1">
+            <span>账户与用量</span>
+            <span class="dsh-entry-row1-pct val-pct">9%</span>
+          </div>
+          <div class="dsh-entry-bar-track">
+            <div class="dsh-entry-bar-fill val-bar"></div>
+          </div>
+          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="preview-section">
+      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
+      <div class="collapsed-rail-sim">
+        <div class="collapsed-btn" id="icon-droplet-rail"></div>
+        <span style="font-size: 11px; color: var(--text-secondary);">水滴外框 + 垂直上升水位</span>
+      </div>
+    </div>
+
+    <div class="zoom-box">
+      <div class="zoom-item">
+        <div id="icon-droplet-zoom16"></div>
+        <span>16×16 原大</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-droplet-zoom24" style="transform: scale(1.5);"></div>
+        <span>24×24</span>
+      </div>
+      <div class="zoom-item">
+        <div id="icon-droplet-zoom32" style="transform: scale(2);"></div>
+        <span>32×32 细节</span>
+      </div>
+    </div>
+
+    <div class="traits">
+      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>“水位池”隐喻</strong>：水滴形状直接呼应“用量水池”。</span></div>
+      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>异形轮廓</strong>：在严谨的系统级 UI 里略显俏皮。</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let currentPct = 9;
+
+// SVG Generators
+function renderHalfRing(pct, risk, size = 16) {
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const arc = Math.PI * 5.25; // ~16.49
+  const fillDash = `${(arc * p) / 100} ${arc}`;
+  const strokeColor = risk ? "var(--error)" : (pct == null ? "var(--text-tertiary)" : "currentColor");
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
+      <path d="M 2.75 12.5 A 5.25 5.25 0 0 1 13.25 12.5" fill="none" stroke="currentColor" stroke-opacity="0.22" stroke-width="2" stroke-linecap="round"/>
+      ${pct != null && p > 0.5 ? `<path d="M 2.75 12.5 A 5.25 5.25 0 0 1 13.25 12.5" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-dasharray="${fillDash}"/>` : ''}
+    </svg>
+  `;
+}
+
+function renderFullRing(pct, risk, size = 16) {
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const r = 5.25;
+  const circ = 2 * Math.PI * r; // ~32.98
+  const fillDash = `${(circ * p) / 100} ${circ}`;
+  const strokeColor = risk ? "var(--error)" : (pct == null ? "var(--text-tertiary)" : "currentColor");
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
+      <circle cx="8" cy="8" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.22" stroke-width="2"/>
+      ${pct != null && p > 0.5 ? `
+        <circle cx="8" cy="8" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round"
+          stroke-dasharray="${fillDash}"
+          transform="rotate(-90 8 8)"/>
+      ` : ''}
+    </svg>
+  `;
+}
+
+function renderBattery(pct, risk, size = 16) {
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const fillW = Math.max(0, (9 * p) / 100);
+  const color = risk ? "var(--error)" : "currentColor";
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
+      <!-- Battery body -->
+      <rect x="2" y="4.5" width="11" height="7" rx="1.8" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.2"/>
+      <!-- Terminal nub -->
+      <path d="M 13.5 6.5 C 14 6.5, 14.5 7, 14.5 7.5 L 14.5 8.5 C 14.5 9, 14 9.5, 13.5 9.5" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.2" stroke-linecap="round"/>
+      <!-- Fill level -->
+      ${pct != null && fillW > 0.5 ? `<rect x="3.2" y="5.7" width="${fillW}" height="4.6" rx="1" fill="${color}"/>` : ''}
+    </svg>
+  `;
+}
+
+function renderDial(pct, risk, size = 16) {
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  // Angle: from -135deg (7:30) to +135deg (4:30), total span 270deg
+  const angle = -135 + (270 * p) / 100;
+  const rad = (angle * Math.PI) / 180;
+  const nx = 8 + 4.8 * Math.cos(rad);
+  const ny = 8 + 4.8 * Math.sin(rad);
+  const color = risk ? "var(--error)" : "currentColor";
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
+      <!-- Arc track: 270 deg -->
+      <path d="M 3.75 12.25 A 6 6 0 1 1 12.25 12.25" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.6" stroke-linecap="round"/>
+      <!-- Center pivot dot -->
+      <circle cx="8" cy="8" r="1.3" fill="currentColor"/>
+      <!-- Needle -->
+      ${pct != null ? `<line x1="8" y1="8" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${color}" stroke-width="1.6" stroke-linecap="round"/>` : ''}
+    </svg>
+  `;
+}
+
+function renderSignal(pct, risk, size = 16) {
+  const p = pct == null ? 0 : pct;
+  const color = risk ? "var(--error)" : "currentColor";
+  // 4 bars at x: 2.5, 6, 9.5, 13; heights: 3.5, 6, 8.5, 11
+  const bars = [
+    { x: 2.5, y: 9.5, h: 3.5, active: p >= 1 },
+    { x: 6.0, y: 7.0, h: 6.0, active: p >= 30 },
+    { x: 9.5, y: 4.5, h: 8.5, active: p >= 60 },
+    { x: 13.0, y: 2.0, h: 11.0, active: p >= 85 }
+  ];
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
+      ${bars.map(b => `
+        <rect x="${b.x}" y="${b.y}" width="2.2" height="${b.h}" rx="0.8"
+          fill="${b.active && pct != null ? color : 'currentColor'}"
+          fill-opacity="${b.active && pct != null ? '1' : '0.2'}"/>
+      `).join('')}
+    </svg>
+  `;
+}
+
+function renderDroplet(pct, risk, size = 16) {
+  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
+  const clipY = 14 - (11 * p) / 100;
+  const color = risk ? "var(--error)" : "currentColor";
+  const dropPath = "M 8 2.2 C 8 2.2, 3.5 7.5, 3.5 10.2 C 3.5 12.6, 5.5 14.2, 8 14.2 C 10.5 14.2, 12.5 12.6, 12.5 10.2 C 12.5 7.5, 8 2.2, 8 2.2 Z";
+  return `
+    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
+      <defs>
+        <clipPath id="dropClip-${size}">
+          <rect x="0" y="${clipY}" width="16" height="16"/>
+        </clipPath>
+      </defs>
+      <!-- Outline -->
+      <path d="${dropPath}" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"/>
+      <!-- Liquid fill -->
+      ${pct != null && p > 0.5 ? `<path d="${dropPath}" fill="${color}" clip-path="url(#dropClip-${size})"/>` : ''}
+    </svg>
+  `;
+}
+
+function updateUI() {
+  const pct = currentPct;
+  const risk = pct != null && pct >= 90;
+  const pctLabel = pct == null ? "—" : `${pct}%`;
+  
+  document.getElementById('pctDisplay').textContent = pctLabel;
+  document.getElementById('pctDisplay').className = `pct-badge ${risk ? 'risk' : ''}`;
+
+  // Update text & bars in all preview boxes
+  document.querySelectorAll('.val-pct').forEach(el => el.textContent = pctLabel);
+  document.querySelectorAll('.val-bar').forEach(el => {
+    el.style.width = pct == null ? '0%' : `${pct}%`;
+    el.className = `dsh-entry-bar-fill ${risk ? 'risk' : ''}`;
+  });
+
+  // Render variant icons
+  const variants = [
+    { id: 'half-ring', fn: renderHalfRing },
+    { id: 'full-ring', fn: renderFullRing },
+    { id: 'battery', fn: renderBattery },
+    { id: 'dial', fn: renderDial },
+    { id: 'signal', fn: renderSignal },
+    { id: 'droplet', fn: renderDroplet }
+  ];
+
+  variants.forEach(v => {
+    const el16 = document.getElementById(`icon-${v.id}-16`);
+    const elRail = document.getElementById(`icon-${v.id}-rail`);
+    const elZ16 = document.getElementById(`icon-${v.id}-zoom16`);
+    const elZ24 = document.getElementById(`icon-${v.id}-zoom24`);
+    const elZ32 = document.getElementById(`icon-${v.id}-zoom32`);
+
+    if (el16) el16.innerHTML = v.fn(pct, risk, 16);
+    if (elRail) elRail.innerHTML = v.fn(pct, risk, 16);
+    if (elZ16) elZ16.innerHTML = v.fn(pct, risk, 16);
+    if (elZ24) elZ24.innerHTML = v.fn(pct, risk, 16);
+    if (elZ32) elZ32.innerHTML = v.fn(pct, risk, 16);
+  });
+}
+
+function updatePct(val) {
+  currentPct = parseInt(val, 10);
+  document.querySelectorAll('.toolbar .btn-chip').forEach(b => b.classList.remove('active'));
+  updateUI();
+}
+
+function setPreset(val) {
+  currentPct = val;
+  if (val != null) document.getElementById('pctSlider').value = val;
+  document.querySelectorAll('.toolbar .btn-chip').forEach(b => {
+    if (b.textContent.includes(val === null ? '—' : `${val}%`)) b.classList.add('active');
+    else b.classList.remove('active');
+  });
+  updateUI();
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️ 切换浅色模式' : '🌙 切换深色模式';
+}
+
+// Initial render
+updateUI();
+</script>
+
+</body>
+</html>
