@@ -507,6 +507,15 @@ test('plans attribute requests to pools with objective cycle math and rates', ()
     assert.equal(summary.configured, true)
     assert.equal(summary.tightest.id, poolId(openai))
     assert.equal(typeof summary.month.daysLeft, 'number')
+    // Every pool carries its own primary window so the sidebar entry can
+    // render a pinned account; the tightest pool's window matches the
+    // top-level tightest selection.
+    const tightestEntry = summary.pools.find((pool) => pool.id === summary.tightest.id)
+    assert.notEqual(tightestEntry, undefined)
+    assert.equal(tightestEntry.window != null, true)
+    assert.equal(tightestEntry.window.usedPct, summary.tightest.usedPct)
+    assert.equal(tightestEntry.window.label, summary.tightest.windowLabel)
+    assert.equal(tightestEntry.window.resetsAt, summary.tightest.resetsAt)
   } finally {
     service.dispose()
   }
@@ -687,6 +696,12 @@ test('saveAccount creates template accounts with limits, rules and official-wind
     assert.equal(summary.tightest.sourceKind, 'official_plugin_internal_api')
     assert.equal(summary.tightest.windowLabel, 'Token usage(5 Hour)')
     assert.equal(summary.tightest.resetsAt, now + 3_600_000)
+    // The per-pool window mirrors the official-first selection.
+    const entryPool = summary.pools.find((pool) => pool.id === created.id)
+    assert.equal(entryPool.window.label, 'Token usage(5 Hour)')
+    assert.equal(entryPool.window.usedPct, 42)
+    assert.equal(entryPool.window.resetsAt, now + 3_600_000)
+    assert.equal(entryPool.window.sourceKind, 'official_plugin_internal_api')
 
     // inspect carries the account identity, declared limits, rules and trend.
     const detail = service.inspect({ kind: 'pool', id: created.id, filter: { timezone: 'UTC' } })

@@ -119,11 +119,16 @@ test('client uses host theme variables and never talks to the network directly',
   assert.ok(!/fetch\(/.test(source), 'client never fetches directly; it uses the loopback channel')
 })
 
-test('sidebar entry renders the tightest-pool micro bars in pools mode', () => {
+test('sidebar entry meters the watched-or-tightest window in pools mode', () => {
   assert.match(source, /tu3-entry-b1/)
+  assert.ok(!source.includes('tu3-entry-b2'), 'the month time bar is retired from the entry')
+  assert.match(source, /MeterGlyph/, 'live half-ring glyph replaces the bar-chart decoration')
+  assert.match(source, /strokeDasharray/)
   assert.match(source, /entry-summary/)
   assert.match(source, /sidebarSummary/)
   assert.match(source, /'pools'/)
+  assert.ok(source.includes('pinSidebar'), 'dock pin affordance')
+  assert.ok(source.includes("'tu3.sidebarWatch'"), 'client-side watch storage')
 })
 
 test('pace notes are average-rate arithmetic, labelled as such', () => {
@@ -211,12 +216,50 @@ test('v5 components render against a mocked host without throwing', async () => 
   assert.ok(registrations.length >= 2)
   const t = (key) => key
 
-  // Sidebar entry renders the dual-bar micro indicator. The registration
-  // returns an element; drive its underlying component function.
+  // Sidebar entry meters the watched-or-tightest window. The registration
+  // returns an element; drive its underlying component function after
+  // seeding the shared store with an entry summary.
   const entry = registrations.find(({ definition }) => definition.name === 'sidebar.footer.action')
+  const overlayForStore = registrations.find(({ definition }) => definition.name === 'shell.overlay')
+  const sharedStore = overlayForStore.component({}).props.store
+  const entrySummaryFixture = {
+    configured: true,
+    month: { elapsedPct: 50, daysLeft: 15, resetLabel: '2026-09-01' },
+    tightest: { id: 'x', name: 'Grok / X subscription', color: null, usedPct: 70, sourceKind: 'official_usage_api', windowLabel: 'weekly', resetsAt: Date.now() + 3_600_000 },
+    pools: [{
+      id: 'connection:openai-codex:default', name: 'ChatGPT Plus/Pro', color: '#3d6ee8', kind: 'subscription',
+      usedPct: 42, window: { label: '5h', resetsAt: Date.now() + 3_600_000, usedPct: 42, sourceKind: 'official_usage_api' },
+    }],
+  }
+  sharedStore.update({ entrySummary: entrySummaryFixture })
   const entryElement = entry.component({ wide: true })
   const entryTree = entryElement.type(entryElement.props)
-  assert.ok(JSON.stringify(entryTree).includes('tu3-entry-b1'), 'dual-bar micro indicator missing')
+  const entryJson = JSON.stringify(entryTree)
+  assert.ok(entryJson.includes('tu3-entry-b1'), 'level bar missing')
+  assert.ok(!entryJson.includes('tu3-entry-b2'), 'the month time bar must be gone')
+  assert.ok(entryJson.includes('Grok / X subscription · weekly'), 'tightest fallback caption missing')
+  assert.ok(entryJson.includes('70%'), 'tightest percentage missing')
+  assert.ok(!entryJson.includes('★ '), 'unpinned entry shows no pin marker')
+
+  // Pinned watch: client-side storage selects the account; the entry mirrors
+  // that account's own window instead of the global tightest.
+  const backing = new Map([['tu3.sidebarWatch', 'connection:openai-codex:default']])
+  globalThis.localStorage = {
+    getItem: (key) => (backing.has(key) ? backing.get(key) : null),
+    setItem: (key, value) => { backing.set(key, value) },
+    removeItem: (key) => { backing.delete(key) },
+  }
+  try {
+    const pinnedElement = entry.component({ wide: true })
+    const pinnedJson = JSON.stringify(pinnedElement.type(pinnedElement.props))
+    assert.ok(pinnedJson.includes('★ ChatGPT Plus/Pro · 5h'), 'pinned focus caption missing')
+    assert.ok(pinnedJson.includes('42%'), 'pinned window percentage missing')
+    assert.ok(pinnedJson.includes('strokeDasharray'), 'live half-ring glyph missing')
+    assert.ok(pinnedJson.includes('Grok / X subscription 70%'), 'hover context keeps the global tightest')
+    assert.ok(!pinnedJson.includes('tu3-entry-b2'), 'month bar stays gone while pinned')
+  } finally {
+    delete globalThis.localStorage
+  }
 
   // Overlay renders dock and dashboard modes, with and without a selected account.
   const overlay = registrations.find(({ definition }) => definition.name === 'shell.overlay')
