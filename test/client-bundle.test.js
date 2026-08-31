@@ -122,8 +122,8 @@ test('client uses host theme variables and never talks to the network directly',
 test('sidebar entry meters the watched-or-tightest window in pools mode', () => {
   assert.match(source, /tu3-entry-b1/)
   assert.ok(!source.includes('tu3-entry-b2'), 'the month time bar is retired from the entry')
-  assert.match(source, /MeterGlyph/, 'live half-ring glyph replaces the bar-chart decoration')
-  assert.match(source, /strokeDasharray/)
+  assert.match(source, /MeterGlyph/, 'energy capsule glyph replaces the bar-chart decoration')
+  assert.match(source, /justifyContent/, 'Split Flex layout for dense sidebars')
   assert.match(source, /entry-summary/)
   assert.match(source, /sidebarSummary/)
   assert.match(source, /'pools'/)
@@ -237,7 +237,7 @@ test('v5 components render against a mocked host without throwing', async () => 
   const entryJson = JSON.stringify(entryTree)
   assert.ok(entryJson.includes('tu3-entry-b1'), 'level bar missing')
   assert.ok(!entryJson.includes('tu3-entry-b2'), 'the month time bar must be gone')
-  assert.ok(entryJson.includes('Grok / X subscription · weekly'), 'tightest fallback caption missing')
+  assert.ok(entryJson.includes('Grok / X subscription'), 'tightest fallback caption name missing')
   assert.ok(entryJson.includes('70%'), 'tightest percentage missing')
   assert.ok(!entryJson.includes('★ '), 'unpinned entry shows no pin marker')
 
@@ -252,9 +252,8 @@ test('v5 components render against a mocked host without throwing', async () => 
   try {
     const pinnedElement = entry.component({ wide: true })
     const pinnedJson = JSON.stringify(pinnedElement.type(pinnedElement.props))
-    assert.ok(pinnedJson.includes('★ ChatGPT Plus/Pro · 5h'), 'pinned focus caption missing')
+    assert.ok(pinnedJson.includes('★ ChatGPT Plus/Pro'), 'pinned focus caption name missing')
     assert.ok(pinnedJson.includes('42%'), 'pinned window percentage missing')
-    assert.ok(pinnedJson.includes('strokeDasharray'), 'live half-ring glyph missing')
     assert.ok(pinnedJson.includes('Grok / X subscription 70%'), 'hover context keeps the global tightest')
     assert.ok(!pinnedJson.includes('tu3-entry-b2'), 'month bar stays gone while pinned')
   } finally {

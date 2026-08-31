@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DSH 账户与用量 · 侧栏 Micro Icon 原型选型</title>
+<title>DSH 账户与用量 · 超长文案适配方案原型</title>
 <style>
   :root {
     --bg-page: #f6f8fa;
@@ -45,8 +45,8 @@
   }
 
   .header {
-    max-width: 1080px;
-    margin: 0 auto 32px;
+    max-width: 1160px;
+    margin: 0 auto 24px;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -63,10 +63,32 @@
     color: var(--text-secondary);
   }
 
+  /* Nav Tabs */
+  .tab-nav {
+    max-width: 1160px;
+    margin: 0 auto 24px;
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  .tab-btn:hover { background: rgba(140, 149, 159, 0.1); color: var(--text-primary); }
+  .tab-btn.active { background: var(--accent); color: #fff; }
+
   /* Control Panel */
   .toolbar {
-    max-width: 1080px;
-    margin: 0 auto 32px;
+    max-width: 1160px;
+    margin: 0 auto 28px;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -86,6 +108,7 @@
   .control-group label {
     font-weight: 600;
     color: var(--text-secondary);
+    white-space: nowrap;
   }
   .slider-wrapper {
     display: flex;
@@ -93,18 +116,17 @@
     gap: 8px;
   }
   input[type="range"] {
-    width: 140px;
+    width: 120px;
     accent-color: var(--accent);
     cursor: pointer;
   }
-  .pct-badge {
+  .badge-val {
     font-size: 13px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
-    min-width: 42px;
+    min-width: 48px;
     color: var(--accent);
   }
-  .pct-badge.risk { color: var(--error); }
   .btn-chip {
     background: var(--bg-page);
     border: 1px solid var(--border);
@@ -118,12 +140,31 @@
   .btn-chip:hover { border-color: var(--accent); color: var(--accent); }
   .btn-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+  .text-input-field {
+    background: var(--bg-page);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 260px;
+    font-family: inherit;
+  }
+  .text-input-field:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* Section Containers */
+  .section-content { display: none; }
+  .section-content.active { display: block; }
+
   /* Grid of Prototypes */
   .grid {
-    max-width: 1080px;
+    max-width: 1160px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
     gap: 24px;
   }
 
@@ -163,7 +204,7 @@
     color: var(--text-secondary);
     font-weight: 500;
   }
-  .card-tag.current {
+  .card-tag.highlight {
     background: rgba(65, 118, 230, 0.12);
     color: var(--accent);
     border-color: rgba(65, 118, 230, 0.3);
@@ -177,7 +218,7 @@
     padding: 14px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
   }
   .preview-label {
     font-size: 10px;
@@ -185,6 +226,19 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-tertiary);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Dynamic Width Sidebar Container Simulation */
+  .sidebar-container-sim {
+    background: var(--bg-card);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 4px;
+    transition: width 0.1s ease;
+    margin: 0 auto;
+    width: 210px;
   }
 
   /* Exact DSH Sidebar Button Simulation */
@@ -194,7 +248,7 @@
     box-sizing: border-box;
     display: flex;
     align-items: flex-start;
-    gap: 10px;
+    gap: 9px;
     width: 100%;
     padding: 8px 10px;
     border-radius: 8px;
@@ -246,55 +300,93 @@
     background: var(--accent);
     transition: width 0.15s, background-color 0.15s;
   }
-  .dsh-entry-bar-fill.risk { background: var(--error); }
-  .dsh-entry-caption {
+
+  /* Caption Styles */
+  .cap-split {
     font-size: 10px;
     color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+  .cap-split .name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex: 1;
+  }
+  .cap-split .time {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+    font-weight: 500;
+    opacity: 0.9;
+  }
+
+  .cap-smart {
+    font-size: 10px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  /* Collapsed Rail Simulation */
-  .collapsed-rail-sim {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: rgba(140, 149, 159, 0.06);
-    padding: 8px 12px;
-    border-radius: 8px;
+  .cap-marquee-wrapper {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
   }
-  .collapsed-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    cursor: pointer;
+  .cap-marquee {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    display: inline-block;
+    transition: transform 0.2s;
+  }
+  .dsh-entry-btn:hover .cap-marquee.scrollable {
+    animation: marquee 5s linear infinite;
+  }
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(0); }
+    80% { transform: translateX(calc(-100% + 140px)); }
+    100% { transform: translateX(calc(-100% + 140px)); }
   }
 
-  /* Zoomed Glyph View */
-  .zoom-box {
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-    padding: 12px;
-    background: var(--bg-page);
-    border-radius: 8px;
-  }
-  .zoom-item {
+  .cap-stack {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 6px;
+    gap: 1px;
+    margin-top: 1px;
+  }
+  .cap-stack .line1 {
     font-size: 10px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
+  .cap-stack .line2 {
+    font-size: 9.5px;
     color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
   }
 
-  /* Pros / Cons */
+  .cap-mid {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* Traits */
   .traits {
     font-size: 12px;
     display: flex;
@@ -310,26 +402,24 @@
   .trait-text { color: var(--text-secondary); }
   .trait-text strong { color: var(--text-primary); }
 
-  /* Floating Switcher Bar for Quick Switch */
-  .floating-bar {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 30px;
-    padding: 8px 16px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-    z-index: 1000;
+  .callout {
+    background: rgba(65, 118, 230, 0.08);
+    border: 1px solid rgba(65, 118, 230, 0.2);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 24px;
+    line-height: 1.6;
   }
-  .floating-bar span {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
+
+  .badge-tag {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(140, 149, 159, 0.15);
+    font-size: 11px;
+    font-family: monospace;
   }
 </style>
 </head>
@@ -337,533 +427,359 @@
 
 <div class="header">
   <div class="title-group">
-    <h1>DSH 账户与用量 · 侧栏 Micro Icon 原型矩阵</h1>
-    <p>16×16 微型槽位适配：拉动滑块实时对比不同水位 (0%~100%) 及折叠态下的视觉表达与辨识度。</p>
+    <h1>DSH 账户与用量 · 超长文案适配方案原型</h1>
+    <p>针对 <span class="badge-tag">Grok / X subscription</span>、<span class="badge-tag">Google Antigravity Enterprise Pro</span> 等超长账户名，在有限侧栏宽度下的 5 种适配策略实测。</p>
   </div>
   <button class="btn-chip" id="themeToggle" onclick="toggleTheme()">🌙 切换深色 / 浅色</button>
+</div>
+
+<!-- Tabs -->
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('tab-long-text')">📏 超长文案 5 种适配方案深度对比</button>
+  <button class="tab-btn" onclick="switchTab('tab-all-icons')">🔋 电池胶囊与 6 款 Icon 矩阵</button>
 </div>
 
 <!-- Controls -->
 <div class="toolbar">
   <div class="control-group">
-    <label>测试水位：</label>
+    <label>侧栏容器宽度：</label>
     <div class="slider-wrapper">
-      <input type="range" id="pctSlider" min="0" max="100" value="9" oninput="updatePct(this.value)">
-      <span class="pct-badge" id="pctDisplay">9%</span>
+      <input type="range" id="widthSlider" min="150" max="280" value="210" oninput="updateWidth(this.value)">
+      <span class="badge-val" id="widthDisplay">210px</span>
     </div>
   </div>
+
   <div class="control-group">
-    <label>典型场景：</label>
-    <button class="btn-chip active" onclick="setPreset(9)">9% (当前实机)</button>
-    <button class="btn-chip" onclick="setPreset(0)">0% (新周期)</button>
-    <button class="btn-chip" onclick="setPreset(42)">42% (日常)</button>
-    <button class="btn-chip" onclick="setPreset(75)">75% (偏紧)</button>
-    <button class="btn-chip" onclick="setPreset(95)">95% (高危红色)</button>
-    <button class="btn-chip" onclick="setPreset(null)">— (无额度)</button>
+    <label>测试真实长名：</label>
+    <button class="btn-chip active" onclick="setAccountPreset('grok')">Grok / X subscription</button>
+    <button class="btn-chip" onclick="setAccountPreset('antigravity')">Google Antigravity Pro</button>
+    <button class="btn-chip" onclick="setAccountPreset('claude')">Claude 3.5 Sonnet</button>
+    <button class="btn-chip" onclick="setAccountPreset('email')">长邮箱账号</button>
+  </div>
+
+  <div class="control-group">
+    <label>自定义输入：</label>
+    <input type="text" id="customInput" class="text-input-field" value="Grok / X subscription" oninput="updateCustomText(this.value)">
   </div>
 </div>
 
-<!-- Prototype Cards Grid -->
-<div class="grid" id="cardGrid">
-
-  <!-- Variant 1: 半环水位计 (Current) -->
-  <div class="card" data-variant="half-ring">
-    <div class="card-header">
-      <div class="card-title">
-        <span>1. 半环仪表盘</span>
-      </div>
-      <span class="card-tag current">当前落地</span>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
-      <button class="dsh-entry-btn">
-        <div class="dsh-entry-icon" id="icon-half-ring-16"></div>
-        <div class="dsh-entry-content">
-          <div class="dsh-entry-row1">
-            <span>账户与用量</span>
-            <span class="dsh-entry-row1-pct val-pct">9%</span>
-          </div>
-          <div class="dsh-entry-bar-track">
-            <div class="dsh-entry-bar-fill val-bar"></div>
-          </div>
-          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
-        </div>
-      </button>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
-      <div class="collapsed-rail-sim">
-        <div class="collapsed-btn" id="icon-half-ring-rail"></div>
-        <span style="font-size: 11px; color: var(--text-secondary);">只剩 36px 按钮时，半环可读水位</span>
-      </div>
-    </div>
-
-    <div class="zoom-box">
-      <div class="zoom-item">
-        <div id="icon-half-ring-zoom16"></div>
-        <span>16×16 原大</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-half-ring-zoom24" style="transform: scale(1.5);"></div>
-        <span>24×24</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-half-ring-zoom32" style="transform: scale(2);"></div>
-        <span>32×32 细节</span>
-      </div>
-    </div>
-
-    <div class="traits">
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>极简留白</strong>：底部开口，线条轻盈，与标题平齐感好。</span></div>
-      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>低水位表现</strong>：在 &lt;10% 时左下角只有很小一段，初看稍显不对称。</span></div>
-    </div>
+<!-- =================================================== -->
+<!-- SECTION 1: 超长文案 5 种适配方案对比 -->
+<!-- =================================================== -->
+<div class="section-content active" id="tab-long-text">
+  <div class="callout" style="max-width: 1160px; margin: 0 auto 24px;">
+    <strong>核心设计挑战与目标：</strong><br>
+    侧栏宽度常受用户拖拽影响（160px ~ 240px）。当账户名为 <code>Grok / X subscription</code> (21字) 或 <code>Google Antigravity Enterprise Team Pro</code> (38字) 时：<br>
+    • <strong>行动目标</strong>：用户最需要看到的<strong>倒计时（如 4d 20h / 6d 19h）绝对不能被省略号吃掉</strong>。<br>
+    • <strong>识别目标</strong>：账户名即使被截断，也能一眼认出是 <code>Grok</code> 还是 <code>Antigravity</code>。
   </div>
 
-  <!-- Variant 2: 完整圆环 (Full Ring) -->
-  <div class="card" data-variant="full-ring">
-    <div class="card-header">
-      <div class="card-title">
-        <span>2. 360° 完整圆环</span>
-      </div>
-      <span class="card-tag">经典推荐</span>
-    </div>
+  <div class="grid">
 
-    <div class="preview-section">
-      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
-      <button class="dsh-entry-btn">
-        <div class="dsh-entry-icon" id="icon-full-ring-16"></div>
-        <div class="dsh-entry-content">
-          <div class="dsh-entry-row1">
-            <span>账户与用量</span>
-            <span class="dsh-entry-row1-pct val-pct">9%</span>
-          </div>
-          <div class="dsh-entry-bar-track">
-            <div class="dsh-entry-bar-fill val-bar"></div>
-          </div>
-          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
+    <!-- Option 1: Split 两端弹性对齐 (🌟 强烈推荐) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">方案 1：两端弹性对齐 (Split Flex)</div>
+        <span class="card-tag highlight">🌟 强烈推荐 · 最稳健</span>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary);">
+        <strong>左侧账户名弹性截断，右侧倒计时锁定固定宽度</strong>。倒计时享有最高展示优先级，永远不被吃掉。
+      </p>
+
+      <div class="preview-section">
+        <div class="preview-label">
+          <span>实机渲染效果 (拖动上方滑块可改变宽度)</span>
+          <span class="sim-w-tag">210px</span>
         </div>
-      </button>
+        <div class="sidebar-container-sim">
+          <button class="dsh-entry-btn" title="悬停展示完整名称与周期详情">
+            <div class="dsh-entry-icon icon-bat-slot"></div>
+            <div class="dsh-entry-content">
+              <div class="dsh-entry-row1">
+                <span>账户与用量</span>
+                <span class="dsh-entry-row1-pct">9%</span>
+              </div>
+              <div class="dsh-entry-bar-track"><div class="dsh-entry-bar-fill" style="width: 9%;"></div></div>
+              <div class="cap-split">
+                <span class="name live-acc-name">★ Grok / X subscription</span>
+                <span class="time">4d 20h</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="traits">
+        <div class="trait-item"><span class="trait-icon">✅</span><span class="trait-text"><strong>倒计时 100% 露出</strong>：右侧时间 <code>flex-shrink: 0</code>，不管名字多长都保底显示。</span></div>
+        <div class="trait-item"><span class="trait-icon">✅</span><span class="trait-text"><strong>结构秩序感极佳</strong>：左文字、右数字，两端对齐如同仪表盘。</span></div>
+        <div class="trait-item"><span class="trait-icon">💡</span><span class="trait-text"><strong>Tooltip 兜底</strong>：悬停可看 100% 完整账户名与周期详情。</span></div>
+      </div>
     </div>
 
-    <div class="preview-section">
-      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
-      <div class="collapsed-rail-sim">
-        <div class="collapsed-btn" id="icon-full-ring-rail"></div>
-        <span style="font-size: 11px; color: var(--text-secondary);">Apple Watch 健身环风格，闭合圆</span>
+    <!-- Option 2: 智能品牌短名 (Smart Alias Extraction) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">方案 2：智能品牌紧凑名 (Smart Clean)</div>
+        <span class="card-tag highlight">🌟 极度清爽</span>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary);">
+        在微型侧栏自动过滤 <code>subscription</code>、<code>Enterprise Plan</code>、<code>Plus/Pro</code> 等冗余套话，只留核心品牌。
+      </p>
+
+      <div class="preview-section">
+        <div class="preview-label">
+          <span>实机渲染效果</span>
+          <span class="sim-w-tag">210px</span>
+        </div>
+        <div class="sidebar-container-sim">
+          <button class="dsh-entry-btn">
+            <div class="dsh-entry-icon icon-bat-slot"></div>
+            <div class="dsh-entry-content">
+              <div class="dsh-entry-row1">
+                <span>账户与用量</span>
+                <span class="dsh-entry-row1-pct">9%</span>
+              </div>
+              <div class="dsh-entry-bar-track"><div class="dsh-entry-bar-fill" style="width: 9%;"></div></div>
+              <div class="cap-smart">
+                <span class="live-smart-name">★ Grok (X) · 4d 20h</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="traits">
+        <div class="trait-item"><span class="trait-icon">✅</span><span class="trait-text"><strong>90% 场景免截断</strong>：<code>Grok / X subscription</code> 变为 <code>Grok (X)</code>，<code>Antigravity Enterprise Plan</code> 变为 <code>Antigravity</code>。</span></div>
+        <div class="trait-item"><span class="trait-icon">✅</span><span class="trait-text"><strong>认知负担最低</strong>：微型槽位不需要看“Enterprise/Subscription”这种无用后缀。</span></div>
       </div>
     </div>
 
-    <div class="zoom-box">
-      <div class="zoom-item">
-        <div id="icon-full-ring-zoom16"></div>
-        <span>16×16 原大</span>
+    <!-- Option 3: 悬停平滑滚动跑马灯 (Hover Marquee) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">方案 3：悬停跑马灯 (Hover Marquee)</div>
+        <span class="card-tag">动态交互</span>
       </div>
-      <div class="zoom-item">
-        <div id="icon-full-ring-zoom24" style="transform: scale(1.5);"></div>
-        <span>24×24</span>
+      <p style="font-size: 12px; color: var(--text-secondary);">
+        默认截断；鼠标悬停在条目上时，超长文字自动平滑向左滚动播放完整文案。
+      </p>
+
+      <div class="preview-section">
+        <div class="preview-label">
+          <span>把鼠标悬停在下方预览框上试试 🖱️</span>
+          <span class="sim-w-tag">210px</span>
+        </div>
+        <div class="sidebar-container-sim">
+          <button class="dsh-entry-btn">
+            <div class="dsh-entry-icon icon-bat-slot"></div>
+            <div class="dsh-entry-content">
+              <div class="dsh-entry-row1">
+                <span>账户与用量</span>
+                <span class="dsh-entry-row1-pct">9%</span>
+              </div>
+              <div class="dsh-entry-bar-track"><div class="dsh-entry-bar-fill" style="width: 9%;"></div></div>
+              <div class="cap-marquee-wrapper">
+                <span class="cap-marquee scrollable live-marquee-text">★ Grok / X subscription · 4d 20h</span>
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
-      <div class="zoom-item">
-        <div id="icon-full-ring-zoom32" style="transform: scale(2);"></div>
-        <span>32×32 细节</span>
+
+      <div class="traits">
+        <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>无需弹窗也能看全</strong>：悬停即滚动，符合桌面原生客户端交互。</span></div>
+        <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>静止态仍会被吃</strong>：不悬停时，后面的倒计时依然可能看不到。</span></div>
       </div>
     </div>
 
-    <div class="traits">
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>最高对称美感</strong>：12点钟顺时针填充，0%时也是完整轨道圈，永不断线。</span></div>
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>通用心智</strong>：系统托盘/下载进度环标准范式，无理解门槛。</span></div>
+    <!-- Option 4: 微型 4 行垂直堆叠 (Vertical Stack) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">方案 4：微型两行 Caption (Vertical Stack)</div>
+        <span class="card-tag">空间换完整性</span>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary);">
+        将账户名与倒计时拆为独立两行。高度增加 ~12px，彻底解决水平空间不足。
+      </p>
+
+      <div class="preview-section">
+        <div class="preview-label">
+          <span>实机渲染效果 (高度增加 12px)</span>
+          <span class="sim-w-tag">210px</span>
+        </div>
+        <div class="sidebar-container-sim">
+          <button class="dsh-entry-btn">
+            <div class="dsh-entry-icon icon-bat-slot"></div>
+            <div class="dsh-entry-content">
+              <div class="dsh-entry-row1">
+                <span>账户与用量</span>
+                <span class="dsh-entry-row1-pct">9%</span>
+              </div>
+              <div class="dsh-entry-bar-track"><div class="dsh-entry-bar-fill" style="width: 9%;"></div></div>
+              <div class="cap-stack">
+                <div class="line1 live-acc-name">★ Grok / X subscription</div>
+                <div class="line2">⏱ 4d 20h 后重置</div>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="traits">
+        <div class="trait-item"><span class="trait-icon">✅</span><span class="trait-text"><strong>信息量最足</strong>：账户名独享一整行，倒计时独享一整行。</span></div>
+        <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>占用更多纵向面积</strong>：相比三行制，条目高度从 54px 变为 66px。</span></div>
+      </div>
+    </div>
+
+    <!-- Option 5: 中间智能截断 (Middle Ellipsis) -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">方案 5：中间省略号截断 (Middle Ellipsis)</div>
+        <span class="card-tag">保留头尾特征</span>
+      </div>
+      <p style="font-size: 12px; color: var(--text-secondary);">
+        保留账户名头部（品牌）与尾部（版本/后缀），中间用 <code>…</code> 折叠。
+      </p>
+
+      <div class="preview-section">
+        <div class="preview-label">
+          <span>实机渲染效果</span>
+          <span class="sim-w-tag">210px</span>
+        </div>
+        <div class="sidebar-container-sim">
+          <button class="dsh-entry-btn">
+            <div class="dsh-entry-icon icon-bat-slot"></div>
+            <div class="dsh-entry-content">
+              <div class="dsh-entry-row1">
+                <span>账户与用量</span>
+                <span class="dsh-entry-row1-pct">9%</span>
+              </div>
+              <div class="dsh-entry-bar-track"><div class="dsh-entry-bar-fill" style="width: 9%;"></div></div>
+              <div class="cap-mid">
+                <span class="live-mid-text">★ Grok…ption · 4d 20h</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="traits">
+        <div class="trait-item"><span class="trait-icon">✅</span><span class="trait-text"><strong>特征更鲜明</strong>：比单纯末尾 <code>...</code> 能保留更多版本/型号信息。</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- =================================================== -->
+<!-- SECTION 2: 电池胶囊与 6 款 Icon 矩阵 -->
+<!-- =================================================== -->
+<div class="section-content" id="tab-all-icons">
+  <div class="grid">
+    <div class="card">
+      <div class="card-header"><div class="card-title">🔋 能量胶囊 / 电池 (选定方案)</div><span class="card-tag highlight">心智最强</span></div>
+      <div class="preview-section"><button class="dsh-entry-btn"><div class="dsh-entry-icon" id="bat-icon-preview"></div><div class="dsh-entry-content"><div class="dsh-entry-row1"><span>账户与用量</span><span class="dsh-entry-row1-pct">9%</span></div><div class="dsh-entry-bar-track"><div class="dsh-entry-bar-fill" style="width: 9%;"></div></div><div class="cap-split"><span class="name">★ ChatGPT Plus/Pro</span><span class="time">6d 19h</span></div></div></button></div>
     </div>
   </div>
-
-  <!-- Variant 3: 能量胶囊 / 电池 (Battery Capsule) -->
-  <div class="card" data-variant="battery">
-    <div class="card-header">
-      <div class="card-title">
-        <span>3. 能量胶囊 / 电池</span>
-      </div>
-      <span class="card-tag">心智最强</span>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
-      <button class="dsh-entry-btn">
-        <div class="dsh-entry-icon" id="icon-battery-16"></div>
-        <div class="dsh-entry-content">
-          <div class="dsh-entry-row1">
-            <span>账户与用量</span>
-            <span class="dsh-entry-row1-pct val-pct">9%</span>
-          </div>
-          <div class="dsh-entry-bar-track">
-            <div class="dsh-entry-bar-fill val-bar"></div>
-          </div>
-          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
-        </div>
-      </button>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
-      <div class="collapsed-rail-sim">
-        <div class="collapsed-btn" id="icon-battery-rail"></div>
-        <span style="font-size: 11px; color: var(--text-secondary);">水平胶囊仓，左到右填充</span>
-      </div>
-    </div>
-
-    <div class="zoom-box">
-      <div class="zoom-item">
-        <div id="icon-battery-zoom16"></div>
-        <span>16×16 原大</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-battery-zoom24" style="transform: scale(1.5);"></div>
-        <span>24×24</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-battery-zoom32" style="transform: scale(2);"></div>
-        <span>32×32 细节</span>
-      </div>
-    </div>
-
-    <div class="traits">
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>额度隐喻直接</strong>：一眼即知代表“储量/消耗”。</span></div>
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>横向呼应</strong>：与下方的长条水平 bar 动势完全同向。</span></div>
-    </div>
-  </div>
-
-  <!-- Variant 4: 速度计指针 (Needle Dial) -->
-  <div class="card" data-variant="dial">
-    <div class="card-header">
-      <div class="card-title">
-        <span>4. 机械指针刻度盘</span>
-      </div>
-      <span class="card-tag">硬核仪表</span>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
-      <button class="dsh-entry-btn">
-        <div class="dsh-entry-icon" id="icon-dial-16"></div>
-        <div class="dsh-entry-content">
-          <div class="dsh-entry-row1">
-            <span>账户与用量</span>
-            <span class="dsh-entry-row1-pct val-pct">9%</span>
-          </div>
-          <div class="dsh-entry-bar-track">
-            <div class="dsh-entry-bar-fill val-bar"></div>
-          </div>
-          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
-        </div>
-      </button>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
-      <div class="collapsed-rail-sim">
-        <div class="collapsed-btn" id="icon-dial-rail"></div>
-        <span style="font-size: 11px; color: var(--text-secondary);">240° 刻度弧 + 中心转动指针</span>
-      </div>
-    </div>
-
-    <div class="zoom-box">
-      <div class="zoom-item">
-        <div id="icon-dial-zoom16"></div>
-        <span>16×16 原大</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-dial-zoom24" style="transform: scale(1.5);"></div>
-        <span>24×24</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-dial-zoom32" style="transform: scale(2);"></div>
-        <span>32×32 细节</span>
-      </div>
-    </div>
-
-    <div class="traits">
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>小百分比极清晰</strong>：9% 指针清晰指向左下，50% 指正上方，90% 指右下。</span></div>
-      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>细节较密</strong>：指针轴心在 16×16 像素下比较紧凑。</span></div>
-    </div>
-  </div>
-
-  <!-- Variant 5: 4阶梯信号柱 (Stepped Signal Bars) -->
-  <div class="card" data-variant="signal">
-    <div class="card-header">
-      <div class="card-title">
-        <span>5. 阶梯量化柱 (4-Bar)</span>
-      </div>
-      <span class="card-tag">像素级锐利</span>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
-      <button class="dsh-entry-btn">
-        <div class="dsh-entry-icon" id="icon-signal-16"></div>
-        <div class="dsh-entry-content">
-          <div class="dsh-entry-row1">
-            <span>账户与用量</span>
-            <span class="dsh-entry-row1-pct val-pct">9%</span>
-          </div>
-          <div class="dsh-entry-bar-track">
-            <div class="dsh-entry-bar-fill val-bar"></div>
-          </div>
-          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
-        </div>
-      </button>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
-      <div class="collapsed-rail-sim">
-        <div class="collapsed-btn" id="icon-signal-rail"></div>
-        <span style="font-size: 11px; color: var(--text-secondary);">4 根离散竖条，按水位逐级亮起</span>
-      </div>
-    </div>
-
-    <div class="zoom-box">
-      <div class="zoom-item">
-        <div id="icon-signal-zoom16"></div>
-        <span>16×16 原大</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-signal-zoom24" style="transform: scale(1.5);"></div>
-        <span>24×24</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-signal-zoom32" style="transform: scale(2);"></div>
-        <span>32×32 细节</span>
-      </div>
-    </div>
-
-    <div class="traits">
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>绝对不糊</strong>：全是垂直矩形，抗锯齿最干净。</span></div>
-      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>离散量化</strong>：4 格代表 25%/50%/75%/100%，9% 时亮 1 格（或空格淡显）。</span></div>
-    </div>
-  </div>
-
-  <!-- Variant 6: 水滴液位 (Liquid Droplet) -->
-  <div class="card" data-variant="droplet">
-    <div class="card-header">
-      <div class="card-title">
-        <span>6. 水位水滴 (Liquid)</span>
-      </div>
-      <span class="card-tag">生动意象</span>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">展开侧栏实机 (Expanded 16px)</div>
-      <button class="dsh-entry-btn">
-        <div class="dsh-entry-icon" id="icon-droplet-16"></div>
-        <div class="dsh-entry-content">
-          <div class="dsh-entry-row1">
-            <span>账户与用量</span>
-            <span class="dsh-entry-row1-pct val-pct">9%</span>
-          </div>
-          <div class="dsh-entry-bar-track">
-            <div class="dsh-entry-bar-fill val-bar"></div>
-          </div>
-          <div class="dsh-entry-caption">★ ChatGPT Plus/Pro · weekly · 重置 6d 19h</div>
-        </div>
-      </button>
-    </div>
-
-    <div class="preview-section">
-      <div class="preview-label">折叠侧栏只看 Icon (Collapsed Rail 36px)</div>
-      <div class="collapsed-rail-sim">
-        <div class="collapsed-btn" id="icon-droplet-rail"></div>
-        <span style="font-size: 11px; color: var(--text-secondary);">水滴外框 + 垂直上升水位</span>
-      </div>
-    </div>
-
-    <div class="zoom-box">
-      <div class="zoom-item">
-        <div id="icon-droplet-zoom16"></div>
-        <span>16×16 原大</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-droplet-zoom24" style="transform: scale(1.5);"></div>
-        <span>24×24</span>
-      </div>
-      <div class="zoom-item">
-        <div id="icon-droplet-zoom32" style="transform: scale(2);"></div>
-        <span>32×32 细节</span>
-      </div>
-    </div>
-
-    <div class="traits">
-      <div class="trait-item"><span class="trait-icon">✨</span><span class="trait-text"><strong>“水位池”隐喻</strong>：水滴形状直接呼应“用量水池”。</span></div>
-      <div class="trait-item"><span class="trait-icon">⚠️</span><span class="trait-text"><strong>异形轮廓</strong>：在严谨的系统级 UI 里略显俏皮。</span></div>
-    </div>
-  </div>
-
 </div>
 
 <script>
-let currentPct = 9;
+let currentWidth = 210;
+let currentAccName = "Grok / X subscription";
+let currentReset = "4d 20h";
 
-// SVG Generators
-function renderHalfRing(pct, risk, size = 16) {
-  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-  const arc = Math.PI * 5.25; // ~16.49
-  const fillDash = `${(arc * p) / 100} ${arc}`;
-  const strokeColor = risk ? "var(--error)" : (pct == null ? "var(--text-tertiary)" : "currentColor");
-  return `
-    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
-      <path d="M 2.75 12.5 A 5.25 5.25 0 0 1 13.25 12.5" fill="none" stroke="currentColor" stroke-opacity="0.22" stroke-width="2" stroke-linecap="round"/>
-      ${pct != null && p > 0.5 ? `<path d="M 2.75 12.5 A 5.25 5.25 0 0 1 13.25 12.5" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-dasharray="${fillDash}"/>` : ''}
-    </svg>
-  `;
-}
+const PRESETS = {
+  grok: { name: "Grok / X subscription", reset: "4d 20h" },
+  antigravity: { name: "Google Antigravity Enterprise Plan Pro", reset: "6d 19h" },
+  claude: { name: "Claude 3.5 Sonnet / AWS Bedrock", reset: "1h 24m" },
+  email: { name: "kittleshrek.personal.team@gmail.com", reset: "12d" }
+};
 
-function renderFullRing(pct, risk, size = 16) {
-  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-  const r = 5.25;
-  const circ = 2 * Math.PI * r; // ~32.98
-  const fillDash = `${(circ * p) / 100} ${circ}`;
-  const strokeColor = risk ? "var(--error)" : (pct == null ? "var(--text-tertiary)" : "currentColor");
-  return `
-    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
-      <circle cx="8" cy="8" r="${r}" fill="none" stroke="currentColor" stroke-opacity="0.22" stroke-width="2"/>
-      ${pct != null && p > 0.5 ? `
-        <circle cx="8" cy="8" r="${r}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round"
-          stroke-dasharray="${fillDash}"
-          transform="rotate(-90 8 8)"/>
-      ` : ''}
-    </svg>
-  `;
-}
-
-function renderBattery(pct, risk, size = 16) {
-  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-  const fillW = Math.max(0, (9 * p) / 100);
+function renderBatterySVG(pct = 9, risk = false, size = 16) {
+  const p = Math.max(0, Math.min(100, pct));
+  const fillW = Math.max(0, (8.5 * p) / 100);
   const color = risk ? "var(--error)" : "currentColor";
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
-      <!-- Battery body -->
-      <rect x="2" y="4.5" width="11" height="7" rx="1.8" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.2"/>
-      <!-- Terminal nub -->
-      <path d="M 13.5 6.5 C 14 6.5, 14.5 7, 14.5 7.5 L 14.5 8.5 C 14.5 9, 14 9.5, 13.5 9.5" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.2" stroke-linecap="round"/>
-      <!-- Fill level -->
-      ${pct != null && fillW > 0.5 ? `<rect x="3.2" y="5.7" width="${fillW}" height="4.6" rx="1" fill="${color}"/>` : ''}
+      <rect x="2" y="4.2" width="11" height="7.6" rx="2" fill="none" stroke="currentColor" stroke-opacity="0.32" stroke-width="1.3"/>
+      <path d="M 13.6 6.8 C 14.1 6.8, 14.4 7.1, 14.4 7.6 L 14.4 8.4 C 14.4 8.9, 14.1 9.2, 13.6 9.2" fill="none" stroke="currentColor" stroke-opacity="0.32" stroke-width="1.3" stroke-linecap="round"/>
+      ${fillW > 0.4 ? `<rect x="3.3" y="5.5" width="${fillW}" height="5" rx="1.1" fill="${color}"/>` : ''}
     </svg>
   `;
 }
 
-function renderDial(pct, risk, size = 16) {
-  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-  // Angle: from -135deg (7:30) to +135deg (4:30), total span 270deg
-  const angle = -135 + (270 * p) / 100;
-  const rad = (angle * Math.PI) / 180;
-  const nx = 8 + 4.8 * Math.cos(rad);
-  const ny = 8 + 4.8 * Math.sin(rad);
-  const color = risk ? "var(--error)" : "currentColor";
-  return `
-    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
-      <!-- Arc track: 270 deg -->
-      <path d="M 3.75 12.25 A 6 6 0 1 1 12.25 12.25" fill="none" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.6" stroke-linecap="round"/>
-      <!-- Center pivot dot -->
-      <circle cx="8" cy="8" r="1.3" fill="currentColor"/>
-      <!-- Needle -->
-      ${pct != null ? `<line x1="8" y1="8" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="${color}" stroke-width="1.6" stroke-linecap="round"/>` : ''}
-    </svg>
-  `;
+function getSmartAlias(name) {
+  let s = name.replace(/★\s*/, '');
+  s = s.replace(/\s*\/\s*X\s+subscription/i, ' (X)');
+  s = s.replace(/Google\s+/i, '');
+  s = s.replace(/\s+Enterprise\s+Plan\s+Pro/i, '');
+  s = s.replace(/\s+Enterprise\s+Plan/i, '');
+  s = s.replace(/\s+Coding\s+Plan\s+Pro/i, '');
+  s = s.replace(/\s+Plus\/Pro/i, '');
+  s = s.replace(/\s*\/\s*AWS\s+Bedrock/i, '');
+  if (s.length > 18) s = s.slice(0, 16) + '…';
+  return '★ ' + s;
 }
 
-function renderSignal(pct, risk, size = 16) {
-  const p = pct == null ? 0 : pct;
-  const color = risk ? "var(--error)" : "currentColor";
-  // 4 bars at x: 2.5, 6, 9.5, 13; heights: 3.5, 6, 8.5, 11
-  const bars = [
-    { x: 2.5, y: 9.5, h: 3.5, active: p >= 1 },
-    { x: 6.0, y: 7.0, h: 6.0, active: p >= 30 },
-    { x: 9.5, y: 4.5, h: 8.5, active: p >= 60 },
-    { x: 13.0, y: 2.0, h: 11.0, active: p >= 85 }
-  ];
-  return `
-    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
-      ${bars.map(b => `
-        <rect x="${b.x}" y="${b.y}" width="2.2" height="${b.h}" rx="0.8"
-          fill="${b.active && pct != null ? color : 'currentColor'}"
-          fill-opacity="${b.active && pct != null ? '1' : '0.2'}"/>
-      `).join('')}
-    </svg>
-  `;
+function getMiddleEllipsis(name, maxLen = 13) {
+  let clean = name.replace(/★\s*/, '');
+  if (clean.length <= maxLen) return '★ ' + clean;
+  const half = Math.floor((maxLen - 3) / 2);
+  return '★ ' + clean.slice(0, half) + '…' + clean.slice(-half);
 }
 
-function renderDroplet(pct, risk, size = 16) {
-  const p = pct == null ? 0 : Math.max(0, Math.min(100, pct));
-  const clipY = 14 - (11 * p) / 100;
-  const color = risk ? "var(--error)" : "currentColor";
-  const dropPath = "M 8 2.2 C 8 2.2, 3.5 7.5, 3.5 10.2 C 3.5 12.6, 5.5 14.2, 8 14.2 C 10.5 14.2, 12.5 12.6, 12.5 10.2 C 12.5 7.5, 8 2.2, 8 2.2 Z";
-  return `
-    <svg width="${size}" height="${size}" viewBox="0 0 16 16" style="display:block;">
-      <defs>
-        <clipPath id="dropClip-${size}">
-          <rect x="0" y="${clipY}" width="16" height="16"/>
-        </clipPath>
-      </defs>
-      <!-- Outline -->
-      <path d="${dropPath}" fill="none" stroke="currentColor" stroke-opacity="0.3" stroke-width="1.3"/>
-      <!-- Liquid fill -->
-      ${pct != null && p > 0.5 ? `<path d="${dropPath}" fill="${color}" clip-path="url(#dropClip-${size})"/>` : ''}
-    </svg>
-  `;
-}
+function updateDOM() {
+  document.getElementById('widthDisplay').textContent = `${currentWidth}px`;
+  document.querySelectorAll('.sim-w-tag').forEach(el => el.textContent = `${currentWidth}px`);
+  document.querySelectorAll('.sidebar-container-sim').forEach(el => el.style.width = `${currentWidth}px`);
 
-function updateUI() {
-  const pct = currentPct;
-  const risk = pct != null && pct >= 90;
-  const pctLabel = pct == null ? "—" : `${pct}%`;
+  const batSvg = renderBatterySVG(9, false, 16);
+  document.querySelectorAll('.icon-bat-slot').forEach(el => el.innerHTML = batSvg);
+  const batPrev = document.getElementById('bat-icon-preview');
+  if (batPrev) batPrev.innerHTML = batSvg;
+
+  document.querySelectorAll('.live-acc-name').forEach(el => el.textContent = `★ ${currentAccName}`);
   
-  document.getElementById('pctDisplay').textContent = pctLabel;
-  document.getElementById('pctDisplay').className = `pct-badge ${risk ? 'risk' : ''}`;
+  const smart = getSmartAlias(currentAccName);
+  document.querySelectorAll('.live-smart-name').forEach(el => el.textContent = `${smart} · ${currentReset}`);
 
-  // Update text & bars in all preview boxes
-  document.querySelectorAll('.val-pct').forEach(el => el.textContent = pctLabel);
-  document.querySelectorAll('.val-bar').forEach(el => {
-    el.style.width = pct == null ? '0%' : `${pct}%`;
-    el.className = `dsh-entry-bar-fill ${risk ? 'risk' : ''}`;
-  });
+  document.querySelectorAll('.live-marquee-text').forEach(el => el.textContent = `★ ${currentAccName} · ${currentReset}`);
 
-  // Render variant icons
-  const variants = [
-    { id: 'half-ring', fn: renderHalfRing },
-    { id: 'full-ring', fn: renderFullRing },
-    { id: 'battery', fn: renderBattery },
-    { id: 'dial', fn: renderDial },
-    { id: 'signal', fn: renderSignal },
-    { id: 'droplet', fn: renderDroplet }
-  ];
+  const mid = getMiddleEllipsis(currentAccName, 13);
+  document.querySelectorAll('.live-mid-text').forEach(el => el.textContent = `${mid} · ${currentReset}`);
 
-  variants.forEach(v => {
-    const el16 = document.getElementById(`icon-${v.id}-16`);
-    const elRail = document.getElementById(`icon-${v.id}-rail`);
-    const elZ16 = document.getElementById(`icon-${v.id}-zoom16`);
-    const elZ24 = document.getElementById(`icon-${v.id}-zoom24`);
-    const elZ32 = document.getElementById(`icon-${v.id}-zoom32`);
-
-    if (el16) el16.innerHTML = v.fn(pct, risk, 16);
-    if (elRail) elRail.innerHTML = v.fn(pct, risk, 16);
-    if (elZ16) elZ16.innerHTML = v.fn(pct, risk, 16);
-    if (elZ24) elZ24.innerHTML = v.fn(pct, risk, 16);
-    if (elZ32) elZ32.innerHTML = v.fn(pct, risk, 16);
-  });
+  document.querySelectorAll('.cap-split .time').forEach(el => el.textContent = currentReset);
 }
 
-function updatePct(val) {
-  currentPct = parseInt(val, 10);
-  document.querySelectorAll('.toolbar .btn-chip').forEach(b => b.classList.remove('active'));
-  updateUI();
+function updateWidth(val) {
+  currentWidth = parseInt(val, 10);
+  updateDOM();
 }
 
-function setPreset(val) {
-  currentPct = val;
-  if (val != null) document.getElementById('pctSlider').value = val;
+function setAccountPreset(key) {
+  const p = PRESETS[key];
+  if (!p) return;
+  currentAccName = p.name;
+  currentReset = p.reset;
+  document.getElementById('customInput').value = p.name;
   document.querySelectorAll('.toolbar .btn-chip').forEach(b => {
-    if (b.textContent.includes(val === null ? '—' : `${val}%`)) b.classList.add('active');
+    if (b.getAttribute('onclick')?.includes(key)) b.classList.add('active');
     else b.classList.remove('active');
   });
-  updateUI();
+  updateDOM();
+}
+
+function updateCustomText(val) {
+  currentAccName = val || 'Custom Account';
+  document.querySelectorAll('.toolbar .btn-chip').forEach(b => b.classList.remove('active'));
+  updateDOM();
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.section-content').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  event.target.classList.add('active');
 }
 
 function toggleTheme() {
@@ -873,8 +789,7 @@ function toggleTheme() {
   document.getElementById('themeToggle').textContent = next === 'dark' ? '☀️ 切换浅色模式' : '🌙 切换深色模式';
 }
 
-// Initial render
-updateUI();
+updateDOM();
 </script>
 
 </body>
