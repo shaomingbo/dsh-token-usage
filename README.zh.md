@@ -5,24 +5,24 @@
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.17
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.18
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.17 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.17 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.17 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.17
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.17 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.18
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到 `v4.2.0` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
+`--profile` 默认是 `web`；`--source` 默认固定到 `v5.0.18` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
 
 ### 本地开发
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.17 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 --source link:$PWD
 ```
 
 安装器只原子修改 `dependencies["dsh-token-usage"]` 和 `dsh.profile.bundles`，执行 `pnpm install --ignore-scripts`（含 corepack 回退），失败时恢复 manifest。手工修改同样两个字段仅作为兜底。
@@ -69,7 +69,7 @@ npm run check
 npm pack --dry-run
 ```
 
-测试只使用合成数据和临时 `DSH_HOME`。当前能力针对 DSH 0.1.1-rc.2 与 Node 22.19+ 验证，不宣称更广兼容性。
+测试只使用合成数据和临时 `DSH_HOME`。当前能力针对 DSH 0.1.2-alpha.2 与 Node 22.19+ 验证，不宣称更广兼容性。
 
 ## 许可证
 
