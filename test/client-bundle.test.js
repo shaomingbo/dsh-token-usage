@@ -287,3 +287,42 @@ test('credential writes mirror the DSH Web high-level facade contract', () => {
   assert.match(source, /describe\.result\.value\.credentials/)
   assert.ok(!source.includes('credentialRequest('), 'the facade must not receive a nested RpcRequest')
 })
+
+test('fullscreen panel: styled account tabs, sub-card strip and stable stack colors', () => {
+  // Account filter tabs carry the pill class; the selected state is tu3-tab.on.
+  assert.match(source, /className: `tu3-tab\$\{state\.account === null \? ' on' : ''\}`/)
+  assert.match(source, /className: `tu3-tab\$\{state\.account === pool\.id \? ' on' : ''\}`/)
+  assert.match(source, /className: `tu3-tab\$\{state\.account === 'unassigned' \? ' on' : ''\}`/)
+  // The hero strip renders each account as its own sub-card with a meta footer
+  // row, and the grid adapts instead of pinning four columns.
+  assert.match(source, /className: 'tu3-pool'/)
+  assert.match(source, /\.tu3-pool \{/)
+  assert.match(source, /\.tu3-poolmeta \{/)
+  assert.match(source, /\.tu3-pools \{[^}]*auto-fill/)
+  // Model-stack colors: one shared mapping for legend, segments, day detail
+  // and ranking rows; 'other' and unranked groups fold to the neutral grey.
+  assert.match(source, /function modelGroupColor/)
+  assert.match(source, /return index >= 0 \? POOL_COLORS\[index % POOL_COLORS\.length\] : UNASSIGNED_COLOR/)
+  assert.match(source, /return modelGroupColor\(data, id\)/)
+  // Pool-stack ranking rows follow the account color; unattributed models stay grey.
+  assert.match(source, /row\.poolId === 'unassigned' \? UNASSIGNED_COLOR : modelGroupColor\(data, row\.key\)/)
+  // Connection section rhythm: the action row keeps its right alignment and
+  // token-scale margins instead of the old margin-shorthand that reset it.
+  assert.match(source, /flexWrap: 'wrap', marginBottom: S\.m \}/)
+  assert.ok(!source.includes("alignSelf: 'flex-start', margin: `"), 'action-row margin shorthand must not override marginLeft: auto')
+  // The full-width connection card is separated from the insight grid above.
+  assert.match(source, /h\('div', \{ style: \{ marginTop: 12 \} \}, connectionSection\)/)
+  // Account switches anchor the scroll at the filter tabs (no clamp jump to
+  // the model ranking while the insight loads); the anchor is re-applied
+  // when the insight content lands, once per account id.
+  assert.match(source, /tabsRowRef/)
+  assert.match(source, /scrollIntoView\(\{ block: 'start' \}\)/)
+  assert.match(source, /minHeight: '100vh'/)
+  assert.match(source, /anchoredIdRef/)
+  assert.match(source, /const scrollTabsIntoView = /)
+  // Model-stack bars always show legend-true colors; the focus dim belongs to
+  // the pool stack only, at a readable opacity.
+  assert.match(source, /const dimOthers = state\.stack === 'pool' && state\.account !== null \? \(id\) => id !== state\.account : null/)
+  assert.ok(!source.includes("opacity: dim ? 0.22 : 1"), 'the near-invisible 0.22 dim made dominant models read as wrong colors')
+  assert.match(source, /opacity: dim \? 0\.3 : 1/)
+})
