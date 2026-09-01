@@ -80,7 +80,17 @@ test('backup and replace-restore round-trip the ledger', () => {
 
     // Simulate a schema-v1 backup: restore must tolerate tables added later.
     const legacy = new DatabaseSync(backupPath)
-    legacy.exec('DROP TABLE price_updates; DROP TABLE request_corrections; DROP TABLE budgets; DROP TABLE project_sources; DROP TABLE projects;')
+    legacy.exec(`
+      DROP TABLE price_updates;
+      DROP TABLE request_corrections;
+      DROP TABLE budgets;
+      DROP TABLE project_sources;
+      DROP TABLE projects;
+      DROP INDEX requests_connection_time;
+      ALTER TABLE requests DROP COLUMN connection_id;
+      ALTER TABLE requests DROP COLUMN cache_read_state;
+      ALTER TABLE requests DROP COLUMN cache_write_state;
+    `)
     legacy.prepare("UPDATE meta SET value = '1' WHERE key = 'schema_version'").run()
     legacy.close()
 

@@ -87,6 +87,19 @@ test('one call per (session, turn, step); repeated usage samples replace instead
     assert.equal(totals.newComputeTokens, (120 + 55) + (30 + 70))
     assert.equal(totals.cacheReadTokens, 0) // last sample wins in full
     assert.equal(totals.requests, 2)
+    let request = service.query({ filter: { timezone: 'UTC', time: { preset: 'all' } }, views: ['page'], page: { entity: 'request', limit: 10 } }).page.rows.find((row) => row.turn === 0)
+    assert.equal(request.cacheReadState, 'absent')
+
+    service.ingestEvent(session.header, {
+      type: 'assistant/message', seq: 2, time: T0 + 1600,
+      data: {
+        turn: 0, step: 0,
+        message: { source: { kind: 'model', provider: 'deepseek', model: 'deepseek-chat' } },
+        usage: { inputTokens: 120, outputTokens: 55, cacheReadTokens: 0 },
+      },
+    })
+    request = service.query({ filter: { timezone: 'UTC', time: { preset: 'all' } }, views: ['page'], page: { entity: 'request', limit: 10 } }).page.rows.find((row) => row.turn === 0)
+    assert.equal(request.cacheReadState, 'reported', 'an explicit zero remains distinguishable from an omitted cache field')
     service.dispose()
   } finally {
     db.cleanup()

@@ -72,6 +72,38 @@ test('re-running migrations on an existing file creates a pre-migration backup',
   }
 })
 
+test('v9 preserves legacy cache facts while restoring reported-versus-unknown presence', () => {
+  const env = tempDir()
+  try {
+    const dbPath = join(env.dir, 'usage.sqlite')
+    const legacy = openDatabase(dbPath)
+    const insert = legacy.prepare(`INSERT INTO requests
+      (session_id, turn, step, seq, time, provider, model_raw, input_tokens, output_tokens,
+       cache_read_tokens, cache_write_tokens, status, original_usd_nano)
+      VALUES (?, 0, 0, 1, ?, 'ollama-cloud', 'glm-5.3', 100, 10, ?, 0, 'ok', ?)`)
+    insert.run('zero', 1, 0, 111)
+    insert.run('positive', 2, 60, 222)
+    legacy.exec(`
+      ALTER TABLE requests DROP COLUMN cache_read_state;
+      ALTER TABLE requests DROP COLUMN cache_write_state;
+      UPDATE meta SET value = '8' WHERE key = 'schema_version';
+    `)
+    legacy.close()
+
+    const migrated = openDatabase(dbPath)
+    const rows = migrated.prepare('SELECT session_id, cache_read_tokens, cache_read_state, cache_write_state, original_usd_nano FROM requests ORDER BY session_id').all().map((row) => ({ ...row }))
+    assert.deepEqual(rows, [
+      { session_id: 'positive', cache_read_tokens: 60, cache_read_state: 'reported', cache_write_state: 'unknown', original_usd_nano: 222 },
+      { session_id: 'zero', cache_read_tokens: 0, cache_read_state: 'unknown', cache_write_state: 'unknown', original_usd_nano: 111 },
+    ])
+    assert.equal(Number(migrated.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value), SCHEMA_VERSION)
+    migrated.close()
+    assert.ok(existsSync(`${dbPath}.pre-migration`))
+  } finally {
+    env.cleanup()
+  }
+})
+
 test('v6 adds account-domain tables without removing legacy tables', () => {
   const db = openDatabase(':memory:')
   try {
@@ -105,7 +137,7 @@ test('v8 adds nullable connection provenance without assigning historical reques
     const row = migrated.prepare("SELECT connection_id AS connectionId, provider FROM requests WHERE session_id = 'legacy'").get()
     assert.equal(row.connectionId, null)
     assert.equal(row.provider, 'antigravity')
-    assert.equal(Number(migrated.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value), 8)
+    assert.equal(Number(migrated.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value), SCHEMA_VERSION)
     migrated.close()
   } finally {
     env.cleanup()

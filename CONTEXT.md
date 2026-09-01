@@ -36,6 +36,10 @@ _Avoid_: Provider usage, bill
 The optional opaque Connection identifier carried by the plugin-owned successful model response and stored as an immutable request fact. Antigravity encodes it in the standard OpenAI response identifier that stock DSH already retains as adapter replay metadata. It names the final Connection after failover; a missing or unsupported replay value stays unknown.
 _Avoid_: Current account, inferred account
 
+**Valuation Scenario**:
+A named, versioned, user-controlled assumption used only when a provider omits a billing category needed for public-list-price valuation. It derives a current estimate without rewriting Usage Ledger facts, and every aggregate exposes both the scenario result and the value calculated from reported categories alone.
+_Avoid_: Bill, observed cache, corrected usage
+
 **Attribution Rule**:
 A user-controlled rule that maps locally observed usage to a Product without rewriting ledger facts. An exact connection rule outranks provider/model fallbacks; rules affect derived views and can change without altering history.
 _Avoid_: Ownership, execution provenance

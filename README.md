@@ -5,24 +5,24 @@
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.19
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.20
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the fixed `v5.0.19` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
+`--profile` defaults to `web`. `--source` defaults to the fixed `v5.0.20` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
 
 ### Local development
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --source link:$PWD
 ```
 
 The installer atomically changes only `dependencies["dsh-token-usage"]` and `dsh.profile.bundles`, runs `pnpm install --ignore-scripts` (with the documented corepack fallback), and restores the manifest if installation fails. Manual editing of those same two fields is a fallback, not the preferred installation path.
@@ -51,6 +51,8 @@ See [`CONTEXT.md`](CONTEXT.md) for the canonical language: Connection, Credentia
 
 Ollama Local has no applicable remote quota. Saving an Ollama Cloud API key synchronizes the official `/api/tags` catalog, enriches each completion model through `/api/show`, and provisions the `ollama-cloud` route against the official OpenAI-compatible `https://ollama.com/v1` endpoint. Context capacity, vision input, and thinking levels come from the official model-details response; output capacity is written only when `num_predict` is explicitly present. A manual sync control refreshes additions and removals without restarting DSH. No dedicated official quota endpoint is claimed, so configured key status remains labeled unverified. Settings-page allowance scraping is a separate explicit opt-in: the user manually pastes a Cookie header; only allowlisted Ollama session-cookie names are retained in the owner-only store. The plugin never reads Chrome or another browser profile, refuses redirects so credentials cannot cross origins, and labels parsed plan/session-hourly/weekly observations `official_ui` and `brittle`.
 
+Ollama Cloud Chat Completions currently do not provide reliable cached-token usage. The plugin therefore defaults to an adjustable **95% cache-hit scenario** for current public-list-price revaluation of `ollama-cloud` only. It never rewrites input/cache ledger facts and also exposes the value calculated from reported categories alone as the no-cache-detail upper bound. Ollama Local and other providers are not affected. Explicitly reported cache data—including a reported zero—wins as soon as DSH preserves that distinction; legacy rows are marked `unknown` because older ingestion lost field presence. This remains an estimate, not an Ollama invoice or charged amount.
+
 ## Privacy and requests
 
 Secrets live only in owner-only files or DSH credentials. SQLite, plugin-owned RPC responses, logs, diagnostics, and exports contain no access token, refresh token, API key, Authorization header, Cookie header, or session-cookie value. RPC channels are loopback-only. Ordinary ledger operation makes no network requests; price updates and provider observation refreshes are explicit. Auth refresh and configured model routes contact only their provider endpoints as required. Redirects carrying credentials are rejected and provider origins are allowlisted.
@@ -63,7 +65,7 @@ The existing path is unchanged:
 
 `<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/`
 
-Linked development still falls back to `<DSH_HOME>/dsh-token-usage/`. Schema v8 is additive: legacy ledger, `plans`, and `plan_rules` tables remain; v5 plans and both quota windows are projected losslessly as manual estimates that stay authoritative for their projected copies, account products retain `color`/`connection_id`, and requests gain nullable `connection_id` provenance without backfilling history. Pool attribution reads `account_attribution_rules` (seeded by the projection for legacy plans). Existing files are backed up before transactional migration. Newer schemas refuse normal writes and have a separate read-only diagnostic seam.
+Linked development still falls back to `<DSH_HOME>/dsh-token-usage/`. Schema v8 additively records nullable request `connection_id` provenance without backfilling history; schema v9 records cache-field presence as `reported`, `absent`, or legacy `unknown` without rewriting token values. The legacy ledger, `plans`, and `plan_rules` remain, and v5 plans are projected losslessly. Pool attribution reads `account_attribution_rules`. Existing files are backed up before transactional migration. Newer schemas refuse normal writes and have a separate read-only diagnostic seam.
 
 ## Development
 

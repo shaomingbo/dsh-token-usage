@@ -139,6 +139,18 @@ test('pace notes are average-rate arithmetic, labelled as such', () => {
   assert.match(source, /leftoverAtExpiryUsd/)
 })
 
+test('Ollama cache-cost scenarios are adjustable and visibly disclosed', () => {
+  for (const label of [
+    'Ollama Cloud assumed cache hit (%)',
+    'Ollama Cloud 假设缓存命中率（%）',
+    'no-cache value',
+    '未计缓存上限',
+  ]) assert.ok(source.includes(label), `missing cache estimate disclosure: ${label}`)
+  assert.ok(source.includes('ollamaCloudCacheEstimatePct'))
+  assert.ok(source.includes('reportedUsageUsdNano'))
+  assert.ok(source.includes('estimatedCacheReadTokens'))
+})
+
 test('v5 components render against a mocked host without throwing', async () => {
   const React = {
     createElement: (type, props, ...children) => ({ type, props, children }),

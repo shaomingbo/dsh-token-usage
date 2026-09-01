@@ -244,6 +244,10 @@ test('apply imports history, serves the loopback channel, and folds live events'
     assert.equal(status.value.total, 1)
     assert.equal(status.value.done, 1)
     assert.equal(status.value.running, false)
+    const pluginSettings = await channel.handler('settings', {})
+    assert.equal(pluginSettings.value.settings.ollamaCloudCacheEstimatePct, 95)
+    assert.equal((await channel.handler('set-setting', { key: 'ollamaCloudCacheEstimatePct', value: 80 })).value.value, 80)
+    assert.equal((await channel.handler('set-setting', { key: 'ollamaCloudCacheEstimatePct', value: 101 })).error.code, 'invalid-setting')
 
     // Overview and project attribution reflect the imported {meta, events}
     // inspection contract.

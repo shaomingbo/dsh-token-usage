@@ -5,24 +5,24 @@
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.19
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.20
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到 `v5.0.19` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
+`--profile` 默认是 `web`；`--source` 默认固定到 `v5.0.20` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
 
 ### 本地开发
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --source link:$PWD
 ```
 
 安装器只原子修改 `dependencies["dsh-token-usage"]` 和 `dsh.profile.bundles`，执行 `pnpm install --ignore-scripts`（含 corepack 回退），失败时恢复 manifest。手工修改同样两个字段仅作为兜底。
@@ -51,6 +51,8 @@ npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --source link:$PWD
 
 Ollama Local 的远端额度为“不适用”。保存 Ollama Cloud API Key 后，插件会同步官方 `/api/tags` 目录，通过 `/api/show` 补全每个 completion 模型，并把 `ollama-cloud` 路由注册到官方 OpenAI-compatible 入口 `https://ollama.com/v1`。上下文容量、视觉输入和 thinking 档位均来自官方模型详情；只有详情明确给出 `num_predict` 时才写入输出上限。账户卡提供手动同步按钮，模型增删可在不重启 DSH 的情况下刷新。由于没有专用的官方额度端点，已配置 Key 的状态仍明确标为“未验证”。设置页额度抓取是独立显式开关：用户手工粘贴 Cookie Header；只把白名单内的 Ollama 会话 cookie 写入 owner-only 存储。本插件绝不读取 Chrome 或其他浏览器目录；携带凭据的重定向会被拒绝；解析出的套餐、会话/小时、周百分比及重置时间标记为 `official_ui`、`brittle`。
 
+Ollama Cloud 当前的 Chat Completions 用量没有可靠提供缓存命中 Token。插件默认使用可调的 **95% 缓存命中场景**重估 `ollama-cloud` 的当前公开标价等值；它不修改输入/缓存账本事实，并同时显示按已报告类别计算的“未计缓存上限”。该场景不应用于 Ollama Local 或其他提供方。缓存字段一旦被 DSH 明确标记为已报告（包括显式 0），真实值即优先；旧数据因历史接口丢失字段存在性而标记为 `unknown`。这个数字仍是估算，不是 Ollama 账单或实际扣款。
+
 ## 隐私与请求
 
 秘密只存在于 owner-only 文件或 DSH credentials 中。SQLite、RPC 返回、日志、诊断和导出都不得包含 access/refresh token、API key、Authorization、Cookie Header 或会话 cookie 值。RPC 仅允许 loopback。普通账本运行不联网；价格更新和提供方观察刷新必须显式触发。认证刷新和已配置模型路由只在必要时访问对应提供方。所有提供方来源都使用 origin 白名单，并拒绝可能泄漏凭据的跨域重定向。
@@ -59,7 +61,7 @@ Ollama Local 的远端额度为“不适用”。保存 Ollama Cloud API Key 后
 
 ## 数据与迁移
 
-原路径不变：`<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/`。link 开发仍回退到 `<DSH_HOME>/dsh-token-usage/`。schema v8 为纯增量：保留原账本、`plans`、`plan_rules`；v5 套餐和两个窗口无损映射为 manual estimate，请求新增可空 `connection_id` 来源且不回填历史。迁移前自动备份并在事务内执行。遇到更新 schema 时普通写入会拒绝，另有只读诊断 seam。
+原路径不变：`<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/`。link 开发仍回退到 `<DSH_HOME>/dsh-token-usage/`。schema v8 增量记录可空的请求 `connection_id` 来源且不回填历史；schema v9 增量记录缓存字段的 `reported` / `absent` / `unknown` 状态，不重写 Token。原账本、`plans`、`plan_rules` 和 v5 套餐无损映射均保留。迁移前自动备份并在事务内执行。遇到更新 schema 时普通写入会拒绝，另有只读诊断 seam。
 
 ## 开发检查
 

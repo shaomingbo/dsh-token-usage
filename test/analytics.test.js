@@ -840,6 +840,88 @@ test('a later empty official_response does not hide an earlier official_ui obser
   }
 })
 
+test('Ollama Cloud cost uses the configured cache scenario in totals and account detail', () => {
+  const service = createLedgerService({
+    databasePath: ':memory:',
+    snapshot: {
+      version: 'cache-fixture',
+      source: 'fixture',
+      models: { 'glm-5.3': { inputNano: 1400, outputNano: 4400, cacheReadNano: 260, cacheWriteNano: 0 } },
+    },
+  })
+  try {
+    service.importSession({
+      header: { version: 0, id: 'ollama-cache', createdAt: T0, cwd: '/work/cache' },
+      events: [
+        { type: 'request/header', seq: 0, time: T0, data: { config: { provider: 'ollama-cloud', model: 'glm-5.3' } } },
+        { type: 'assistant/message', seq: 1, time: T0 + 1, data: { turn: 0, step: 0, message: { source: { kind: 'model', provider: 'ollama-cloud', model: 'glm-5.3' } }, usage: { inputTokens: 100, outputTokens: 10 } } },
+        { type: 'assistant/message', seq: 2, time: T0 + 60_001, data: { turn: 0, step: 1, message: { source: { kind: 'model', provider: 'ollama-cloud', model: 'glm-5.3' } }, usage: { inputTokens: 200, outputTokens: 5 } } },
+      ],
+    })
+    const account = service.saveAccount({
+      name: 'Ollama Cloud', kind: 'subscription', providerId: 'ollama',
+      rules: [{ matchProvider: 'ollama-cloud', priority: 0 }],
+    })
+
+    const result = service.query({ filter: { timezone: 'UTC', time: { preset: 'all' } }, views: ['kpis'], now: T0 + DAY })
+    assert.equal(result.kpis.inputTokens, 300, 'raw usage facts stay unchanged')
+    assert.equal(result.kpis.cacheReadTokens, 0, 'estimated cache never rewrites reported cache facts')
+    assert.equal(result.kpis.cost.currentUsdNano, 161100)
+    assert.equal(result.kpis.cost.reportedUsageUsdNano, 486000)
+    assert.equal(result.kpis.cost.estimatedCacheReadTokens, 285)
+    assert.equal(result.kpis.cost.cacheEstimationMethod, 'ollama-cloud-assumed-rate-v1')
+
+    const detail = service.inspect({ kind: 'pool', id: account.id, filter: { timezone: 'UTC', time: { preset: 'all' } }, now: T0 + DAY })
+    assert.equal(detail.direct.cost.currentUsdNano, 161100, 'account cumulative cost uses the same estimate')
+    assert.equal(detail.direct.cost.reportedUsageUsdNano, 486000)
+    assert.equal(detail.direct.cost.estimatedCacheReadTokens, 285)
+    assert.equal(detail.account.kpis.cost.currentUsdNano, 161100, 'account card cost uses the same valuation seam')
+    const pools = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now: T0 + DAY })
+    const pool = pools.pools.pools.find((entry) => entry.id === account.id)
+    assert.equal(pool.kpis.cost.currentUsdNano, 161100)
+    assert.equal(pool.kpis.cost.reportedUsageUsdNano, 486000)
+
+    service.setOllamaCacheEstimateBps(5000)
+    const adjusted = service.inspect({ kind: 'pool', id: account.id, filter: { timezone: 'UTC', time: { preset: 'all' } }, now: T0 + DAY })
+    assert.equal(adjusted.direct.cost.currentUsdNano, 315000, 'changing the scenario revalues cumulative cost without rewriting usage')
+    assert.equal(adjusted.direct.cost.reportedUsageUsdNano, 486000)
+    assert.equal(adjusted.direct.cost.estimatedCacheReadTokens, 150)
+  } finally {
+    service.dispose()
+  }
+})
+
+test('reported Ollama Cloud cache data wins and makes later zero values authoritative', () => {
+  const service = createLedgerService({
+    databasePath: ':memory:',
+    snapshot: {
+      version: 'cache-fixture', source: 'fixture',
+      models: { 'glm-5.3': { inputNano: 1400, outputNano: 4400, cacheReadNano: 260, cacheWriteNano: 0 } },
+    },
+  })
+  try {
+    service.importSession({
+      header: { version: 0, id: 'ollama-reported-cache', createdAt: T0, cwd: '/work/cache' },
+      events: [
+        { type: 'assistant/message', seq: 1, time: T0 + 1, data: { turn: 0, step: 0, message: { source: { kind: 'model', provider: 'ollama-cloud', model: 'glm-5.3' } }, usage: { inputTokens: 100, outputTokens: 10 } } },
+        { type: 'assistant/message', seq: 2, time: T0 + 60_001, data: { turn: 0, step: 1, message: { source: { kind: 'model', provider: 'ollama-cloud', model: 'glm-5.3' } }, usage: { inputTokens: 30, outputTokens: 5, cacheReadTokens: 100 } } },
+        { type: 'assistant/message', seq: 3, time: T0 + 120_001, data: { turn: 0, step: 2, message: { source: { kind: 'model', provider: 'ollama-cloud', model: 'glm-5.3' } }, usage: { inputTokens: 40, outputTokens: 5, cacheReadTokens: 0 } } },
+      ],
+    })
+    const result = service.query({ filter: { timezone: 'UTC', time: { preset: 'all' } }, views: ['kpis', 'page'], page: { entity: 'request', limit: 10 }, now: T0 + DAY })
+    assert.equal(result.kpis.cost.currentUsdNano, 243700)
+    assert.equal(result.kpis.cost.reportedUsageUsdNano, 352000)
+    assert.equal(result.kpis.cost.estimatedCacheReadTokens, 95)
+    assert.equal(result.kpis.cost.cacheEstimationMethod, 'ollama-cloud-assumed-rate-v1')
+    const reported = result.page.rows.find((row) => row.cacheReadTokens === 100)
+    assert.equal(reported.estimatedCacheReadTokens, 0)
+    const laterZero = result.page.rows.find((row) => row.step === 2)
+    assert.equal(laterZero.estimatedCacheReadTokens, 0)
+  } finally {
+    service.dispose()
+  }
+})
+
 test('saveAccount creates template accounts with limits, rules and official-window merging', () => {
   const service = createLedgerService({ databasePath: ':memory:' })
   try {
