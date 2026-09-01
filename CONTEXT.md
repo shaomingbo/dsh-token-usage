@@ -29,12 +29,16 @@ A time-stamped, secret-free statement about connection, product, billing, or lim
 _Avoid_: Truth, entitlement
 
 **Usage Ledger**:
-The profile-private durable account of model calls observable by DSH, including token facts, local attribution, and valuation. It is independent of provider observations and cannot claim provider-internal retries or invoice accuracy.
+The profile-private durable account of model calls observable by DSH, including token facts, optional connection provenance, local attribution, and valuation. It is independent of provider observations and cannot claim provider-internal retries or invoice accuracy.
 _Avoid_: Provider usage, bill
 
+**Connection Provenance**:
+The optional opaque Connection identifier observed on the successful model response and stored as an immutable request fact. It names the final Connection after failover; a missing value stays unknown.
+_Avoid_: Current account, inferred account
+
 **Attribution Rule**:
-A user-controlled rule that maps locally observed provider/model usage to a connection or product without rewriting the underlying ledger facts. Rules affect derived views and can be changed without altering history.
-_Avoid_: Ownership, request stamp
+A user-controlled rule that maps locally observed usage to a Product without rewriting ledger facts. An exact connection rule outranks provider/model fallbacks; rules affect derived views and can change without altering history.
+_Avoid_: Ownership, execution provenance
 
 **Product Template**:
 A versioned, host-side catalog entry describing a provider offering's structure — windows, officially published exact values, tiers, and provider aliases — used to pre-fill account creation. Templates carry structure, never secrets, and their numbers come from dated research rather than being hardcoded in the client.

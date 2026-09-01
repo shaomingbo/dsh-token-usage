@@ -30,6 +30,7 @@ test('v2 schema stores project identities, request metadata, corrections, and bu
   try {
     const requestColumns = new Set(db.prepare("PRAGMA table_info('requests')").all().map((row) => row.name))
     assert.ok(requestColumns.has('duration_ms'))
+    assert.ok(requestColumns.has('connection_id'))
     assert.ok(requestColumns.has('end_reason'))
     assert.ok(requestColumns.has('failure_type'))
     const tables = new Set(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name))
@@ -84,6 +85,30 @@ test('v6 adds account-domain tables without removing legacy tables', () => {
     assert.equal(secretColumns.some((name) => /token|secret|cookie|authorization|value/i.test(name)), false)
   } finally {
     db.close()
+  }
+})
+
+test('v8 adds nullable connection provenance without assigning historical requests', () => {
+  const env = tempDir()
+  try {
+    const dbPath = join(env.dir, 'usage.sqlite')
+    const legacy = openDatabase(dbPath)
+    legacy.exec('DROP INDEX requests_connection_time')
+    legacy.exec('ALTER TABLE requests DROP COLUMN connection_id')
+    legacy.prepare(`INSERT INTO requests
+      (session_id, turn, step, seq, time, provider, model_raw, owned)
+      VALUES ('legacy', 0, 0, 1, 1, 'antigravity', 'gemini', 1)`).run()
+    legacy.prepare("UPDATE meta SET value = '7' WHERE key = 'schema_version'").run()
+    legacy.close()
+
+    const migrated = openDatabase(dbPath)
+    const row = migrated.prepare("SELECT connection_id AS connectionId, provider FROM requests WHERE session_id = 'legacy'").get()
+    assert.equal(row.connectionId, null)
+    assert.equal(row.provider, 'antigravity')
+    assert.equal(Number(migrated.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value), 8)
+    migrated.close()
+  } finally {
+    env.cleanup()
   }
 })
 

@@ -7,6 +7,7 @@ import test from 'node:test'
 import { OAuthCredentialFileStore, parseOAuthDocument } from '../lib/capabilities/chatgpt-grok/oauth-store.js'
 import { AuthStore, parseAuthDocument } from '../lib/capabilities/antigravity/auth-store.js'
 import { createAccountRouter, isQuotaExhaustion } from '../lib/capabilities/antigravity/account-router.js'
+import { createProxy } from '../lib/capabilities/antigravity/proxy.js'
 import {
   antigravityRoutePatch,
   antigravityRouteNeedsProvisioning,
@@ -66,8 +67,80 @@ test('Antigravity route patch keeps user models while repairing owned connectivi
   assert.equal(patch.apiKeyEnv, 'ANTIGRAVITY_ACCESS_TOKEN')
   assert.equal(patch.api, 'openai-completions')
   assert.equal(patch.baseURL, proxyUrl)
+  assert.equal(patch.connectionIdHeader, 'x-dsh-connection-id')
   assert.deepEqual(patch.compat, { supportsDeveloperRole: false, maxTokensField: 'max_tokens' })
   assert.equal(antigravityRouteNeedsProvisioning(patch, proxyUrl), false)
+  const unstamped = { ...patch }
+  delete unstamped.connectionIdHeader
+  assert.equal(antigravityRouteNeedsProvisioning(unstamped, proxyUrl), true)
+})
+
+test('Antigravity proxy identifies the final connection on a successful completion', async t => {
+  const upstream = [
+    'data: {"response":{"candidates":[{"content":{"parts":[{"text":"hello"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1,"totalTokenCount":2}}}',
+    '',
+  ].join('\n')
+  const proxy = createProxy({
+    auth: {},
+    accountRouter: {
+      route: async () => ({
+        ok: true,
+        accountId: 'connection-b',
+        response: new Response(upstream, { headers: { 'content-type': 'text/event-stream' } }),
+        retry: async () => assert.fail('unexpected retry'),
+      }),
+    },
+    client: {},
+    port: 0,
+  })
+  await proxy.start()
+  t.after(() => proxy.stop())
+
+  const response = await fetch(`${proxy.url}/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'gemini-3.6-flash', messages: [{ role: 'user', content: 'hi' }] }),
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('x-dsh-connection-id'), 'connection-b')
+
+  const streamed = await fetch(`${proxy.url}/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'gemini-3.6-flash', messages: [{ role: 'user', content: 'hi' }], stream: true }),
+  })
+  assert.equal(streamed.status, 200)
+  assert.equal(streamed.headers.get('x-dsh-connection-id'), 'connection-b')
+  assert.match(await streamed.text(), /hello/)
+})
+
+test('Antigravity proxy does not identify a connection for an in-band stream error', async t => {
+  const proxy = createProxy({
+    auth: {},
+    accountRouter: {
+      route: async () => ({
+        ok: true,
+        accountId: 'connection-a',
+        response: new Response('data: {"error":{"message":"upstream failed"}}\n\n'),
+        retry: async () => assert.fail('unexpected retry'),
+      }),
+    },
+    client: {},
+    port: 0,
+  })
+  await proxy.start()
+  t.after(() => proxy.stop())
+
+  const response = await fetch(`${proxy.url}/chat/completions`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'gemini-3.6-flash', messages: [{ role: 'user', content: 'hi' }], stream: true }),
+  })
+
+  assert.equal(response.status, 200)
+  assert.equal(response.headers.get('x-dsh-connection-id'), null)
+  assert.match(await response.text(), /upstream failed/)
 })
 
 test('Account router fails over only on quota exhaustion and activates successful account', async () => {

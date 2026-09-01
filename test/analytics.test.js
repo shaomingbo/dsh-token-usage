@@ -5,13 +5,13 @@ import { createLedgerService } from '../lib/ledger/service.js'
 const DAY = 86_400_000
 const T0 = Date.UTC(2026, 7, 1, 8)
 
-function session({ id, cwd, time, model = 'deepseek-chat', provider = 'deepseek', input = 100, output = 50, cache = 200 }) {
+function session({ id, cwd, time, model = 'deepseek-chat', provider = 'deepseek', connectionId, input = 100, output = 50, cache = 200 }) {
   return {
     header: { version: 0, id, createdAt: time, cwd },
     events: [
       { type: 'session/start', seq: 0, time, data: {} },
       { type: 'request/header', seq: 1, time: time + 1, data: { config: { provider, model } } },
-      { type: 'assistant/message', seq: 2, time: time + 2, data: { turn: 0, step: 0, message: { source: { kind: 'model', provider, model } }, usage: { inputTokens: input, outputTokens: output, cacheReadTokens: cache } } },
+      { type: 'assistant/message', seq: 2, time: time + 2, data: { turn: 0, step: 0, message: { source: { kind: 'model', provider, model, ...(connectionId === undefined ? {} : { connectionId }) } }, usage: { inputTokens: input, outputTokens: output, cacheReadTokens: cache } } },
       { type: 'step/end', seq: 3, time: time + 3, data: { turn: 0, step: 0 } },
     ],
   }
@@ -621,6 +621,112 @@ test('zero-config connection accounts attribute local usage and respect archives
     const account = accounts.find((entry) => entry.id === ensured.id)
     assert.equal(account.archived, true)
     assert.ok(account.rules.every((rule) => rule.sourceKind === 'connection_default'))
+  } finally {
+    service.dispose()
+  }
+})
+
+test('connection provenance attributes pooled provider traffic exactly and leaves legacy rows unassigned', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const now = Date.UTC(2026, 7, 30, 12)
+    service.saveAccountConnection({ providerId: 'antigravity', connectionId: 'connection-a', displayName: 'Account A', configured: true })
+    service.saveAccountConnection({ providerId: 'antigravity', connectionId: 'connection-b', displayName: 'Account B', configured: true })
+    const first = service.ensureConnectionAccount(
+      { providerId: 'antigravity', connectionId: 'connection-a', displayName: 'Account A', configured: true },
+      { aliases: ['antigravity'], attribution: 'connection' },
+    )
+    const second = service.ensureConnectionAccount(
+      { providerId: 'antigravity', connectionId: 'connection-b', displayName: 'Account B', configured: true },
+      { aliases: ['antigravity'], attribution: 'connection' },
+    )
+    service.importSession(session({
+      id: 'ag-a', cwd: '/w/a', time: now - DAY, provider: 'antigravity', model: 'gemini',
+      connectionId: 'connection-a', input: 80, output: 20, cache: 0,
+    }))
+    service.importSession(session({
+      id: 'ag-b', cwd: '/w/a', time: now - DAY, provider: 'antigravity', model: 'gemini',
+      connectionId: 'connection-b', input: 150, output: 50, cache: 0,
+    }))
+    service.importSession(session({
+      id: 'ag-legacy', cwd: '/w/a', time: now - DAY, provider: 'antigravity', model: 'gemini',
+      input: 225, output: 75, cache: 0,
+    }))
+
+    const result = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now })
+    assert.equal(result.pools.pools.find((pool) => pool.id === first.id).kpis.newComputeTokens, 100)
+    assert.equal(result.pools.pools.find((pool) => pool.id === second.id).kpis.newComputeTokens, 200)
+    assert.equal(result.pools.unassigned.newComputeTokens, 300)
+  } finally {
+    service.dispose()
+  }
+})
+
+test('exact connection attribution outranks provider fallbacks', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const fallbackConnection = { providerId: 'antigravity', connectionId: 'fallback', displayName: 'Fallback', configured: true }
+    const exactConnection = { providerId: 'antigravity', connectionId: 'connection-a', displayName: 'Account A', configured: true }
+    service.saveAccountConnection(fallbackConnection)
+    service.saveAccountConnection(exactConnection)
+    const fallback = service.ensureConnectionAccount(fallbackConnection, { aliases: ['antigravity'], attribution: 'provider' })
+    const exact = service.ensureConnectionAccount(exactConnection, { aliases: ['antigravity'], attribution: 'connection' })
+    service.importSession(session({
+      id: 'exact-rule', cwd: '/w/a', time: T0, provider: 'antigravity', model: 'gemini',
+      connectionId: 'connection-a', input: 80, output: 20, cache: 0,
+    }))
+    service.importSession(session({
+      id: 'fallback-rule', cwd: '/w/a', time: T0 + 1, provider: 'antigravity', model: 'gemini',
+      input: 30, output: 20, cache: 0,
+    }))
+
+    const result = service.query({ filter: { timezone: 'UTC', time: { preset: 'all' } }, views: ['pools'], now: T0 + DAY })
+    assert.equal(result.pools.pools.find((pool) => pool.id === exact.id).kpis.newComputeTokens, 100)
+    assert.equal(result.pools.pools.find((pool) => pool.id === fallback.id).kpis.newComputeTokens, 50)
+  } finally {
+    service.dispose()
+  }
+})
+
+test('live assistant messages retain connection provenance in request views', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const header = { version: 0, id: 'live-connection', createdAt: T0, cwd: '/w/a' }
+    service.ingestEvent(header, {
+      type: 'request/header', seq: 0, time: T0,
+      data: { config: { provider: 'antigravity', model: 'gemini' } },
+    })
+    service.ingestEvent(header, {
+      type: 'assistant/message', seq: 1, time: T0 + 1,
+      data: {
+        turn: 0, step: 0,
+        message: { source: { kind: 'model', provider: 'antigravity', model: 'gemini', connectionId: 'connection-b' } },
+        usage: { inputTokens: 12, outputTokens: 3 },
+      },
+    })
+
+    const result = service.query({
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['page'],
+      page: { entity: 'request', limit: 10 },
+    })
+    assert.equal(result.page.rows[0].connectionId, 'connection-b')
+  } finally {
+    service.dispose()
+  }
+})
+
+test('connection-account reconciliation removes stale system attribution rules', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const connection = { providerId: 'antigravity', connectionId: 'connection-a', displayName: 'Account A', configured: true }
+    service.saveAccountConnection(connection)
+    const account = service.ensureConnectionAccount(connection, { aliases: ['antigravity'], attribution: 'provider' })
+    assert.equal(service.listAccounts().find((item) => item.id === account.id).rules.length, 1)
+
+    service.ensureConnectionAccount(connection, { aliases: ['antigravity'], attribution: 'none' })
+
+    assert.deepEqual(service.listAccounts().find((item) => item.id === account.id).rules, [])
   } finally {
     service.dispose()
   }

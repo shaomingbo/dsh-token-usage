@@ -31,7 +31,7 @@ The installer atomically changes only `dependencies["dsh-token-usage"]` and `dsh
 
 The interaction is one journey: sidebar entry → dock → overview → per-account insight.
 
-- **Zero-config accounts:** every configured connection (ChatGPT/Codex, Grok, each Antigravity account, GLM, Ollama Local/Cloud) becomes an `account_products` row with default attribution rules the moment it appears. Archived accounts are never resurrected.
+- **Zero-config accounts:** every configured connection (ChatGPT/Codex, Grok, each Antigravity account, GLM, Ollama Local/Cloud) becomes an `account_products` row with default attribution rules the moment it appears. Antigravity rules use the exact connection stamped by its proxy, including the final account after quota failover. Archived accounts are never resurrected.
 - **Official-first meters:** CodexBar-style percent bars per window (primary 5h, weekly, daily, term) with reset countdowns, source badges (`official API`, `official page (brittle)`, `local ledger`, `user estimate`) and observed-at timestamps. The ledger never converts official percentages into token guesses; credits/percent limits stay official-observed only.
 - **Simple configuration:** a host-side product-template catalog (`lib/accounts/templates.json`, seeded into `provider_templates`) pre-fills windows, exact values (GLM plan credits, Aliyun request caps, Gemini daily requests) and provider aliases. The wizard suggests accounts from observed ledger traffic; an advanced form still covers custom quotas, prices, balances and rules.
 - **Honest local half:** each account's DSH-observed usage (equivalent $, new-compute tokens, requests, model table, 30-day trend) with average-rate extrapolation explicitly labeled as arithmetic, never as a forecast.
@@ -43,7 +43,7 @@ See [`CONTEXT.md`](CONTEXT.md) for the canonical language: Connection, Credentia
 
 - **Provider connections:** ChatGPT and Grok OAuth capabilities retain `<DSH_HOME>/.oauth.json`; Antigravity retains `<DSH_HOME>/.antigravity-auth.json`, multi-account activation, auto-failover, model route, and loopback proxy behavior. The UI starts OAuth/device authorization, supports Antigravity activation/removal, and imports GLM/Ollama API credentials through DSH Credentials. GLM, Ollama Local, and Ollama Cloud use the same internal provider-adapter seam.
 - **Official observations:** provider-reported product, billing, allowance percentages, and resets are shown separately from local history. Limit values represent exact, range, dynamic, unpublished, or manual knowledge across rolling, fixed, billing-cycle, or rate windows.
-- **Local usage ledger:** the existing `usage.sqlite`, request folding, project attribution, valuation, imports, corrections, exports, backups, retention, and `/token-usage` compatibility channel remain. It is a DSH-observed ledger, not a provider invoice.
+- **Local usage ledger:** the existing `usage.sqlite`, request folding, project attribution, valuation, imports, corrections, exports, backups, retention, and `/token-usage` compatibility channel remain. Request facts retain optional provider connection provenance; exact connection rules outrank provider/model fallbacks, while unstamped historical rows remain unassigned unless an explicit fallback rule matches. It is a DSH-observed ledger, not a provider invoice.
 - **Compatibility:** `/account-usage` is the unified loopback channel. `/token-usage` and `/subscription-antigravity` remain for the 4.x transition. When `dsh-subscription-search` is co-installed, it retains exclusive ownership of `/subscription-search`; this bundle registers only its callable ChatGPT/Grok backends through `searchChain` to avoid dual ownership.
 - **Optional search-chain capability:** when the host exposes `searchChain`, ChatGPT/Grok may be registered as callable backends without returning credentials to callers. Search orchestration itself is not part of this package.
 
@@ -63,7 +63,7 @@ The existing path is unchanged:
 
 `<DSH_HOME>/profiles/<profile>/data/dsh-token-usage/`
 
-Linked development still falls back to `<DSH_HOME>/dsh-token-usage/`. Schema v7 is additive: legacy ledger, `plans`, and `plan_rules` tables remain; v5 plans and both quota windows are projected losslessly as manual estimates that stay authoritative for their projected copies, and account products gain `color`/`connection_id` columns. Pool attribution now reads `account_attribution_rules` (seeded by the projection for legacy plans). Existing files are backed up before transactional migration. Newer schemas refuse normal writes and have a separate read-only diagnostic seam.
+Linked development still falls back to `<DSH_HOME>/dsh-token-usage/`. Schema v8 is additive: legacy ledger, `plans`, and `plan_rules` tables remain; v5 plans and both quota windows are projected losslessly as manual estimates that stay authoritative for their projected copies, account products retain `color`/`connection_id`, and requests gain nullable `connection_id` provenance without backfilling history. Pool attribution reads `account_attribution_rules` (seeded by the projection for legacy plans). Existing files are backed up before transactional migration. Newer schemas refuse normal writes and have a separate read-only diagnostic seam.
 
 ## Development
 
