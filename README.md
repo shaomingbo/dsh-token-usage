@@ -5,24 +5,24 @@
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.18
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.19
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.18
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.19
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the fixed `v5.0.18` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
+`--profile` defaults to `web`. `--source` defaults to the fixed `v5.0.19` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
 
 ### Local development
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.19 --source link:$PWD
 ```
 
 The installer atomically changes only `dependencies["dsh-token-usage"]` and `dsh.profile.bundles`, runs `pnpm install --ignore-scripts` (with the documented corepack fallback), and restores the manifest if installation fails. Manual editing of those same two fields is a fallback, not the preferred installation path.
@@ -73,7 +73,7 @@ npm run check
 npm pack --dry-run
 ```
 
-Tests use synthetic data and temporary `DSH_HOME` directories. The package targets the capabilities verified against DSH 0.1.2-alpha.2 and Node 22.19+; it does not claim broader compatibility.
+Tests use synthetic data and temporary `DSH_HOME` directories. The package targets the capabilities verified against stock DSH 0.1.1-rc.2, DSH 0.1.2-alpha.2, and Node 22.19+; it does not claim broader compatibility.
 
 ## License
 
