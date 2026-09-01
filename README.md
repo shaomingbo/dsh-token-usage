@@ -5,24 +5,24 @@
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.20
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.21
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.20
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.21 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.21 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.21 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.21
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.21 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the fixed `v5.0.20` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
+`--profile` defaults to `web`. `--source` defaults to the fixed `v5.0.21` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`.
 
 ### Local development
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.20 --source link:$PWD
+npx --yes github:shaomingbo/dsh-token-usage#v5.0.21 --source link:$PWD
 ```
 
 The installer atomically changes only `dependencies["dsh-token-usage"]` and `dsh.profile.bundles`, runs `pnpm install --ignore-scripts` (with the documented corepack fallback), and restores the manifest if installation fails. Manual editing of those same two fields is a fallback, not the preferred installation path.

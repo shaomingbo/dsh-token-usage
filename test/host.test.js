@@ -7,7 +7,11 @@ import { pathToFileURL } from 'node:url'
 import {
   ACCOUNT_USAGE_PROTOCOL,
   ACCOUNT_USAGE_SERVICE,
+  OBSERVATION_REFRESH_ACTIVE_MS,
+  OBSERVATION_REFRESH_LULL_MS,
+  CLIENT_POLL_STREAM_MS,
   apply,
+  observationRefreshDue,
   resolveDataDir,
   detectGitProject,
   secretSafeLogger,
@@ -91,6 +95,32 @@ test('module contract: name and host injections', () => {
   assert.ok(inject.includes('sessionPersistence'))
   assert.ok(inject.includes('settings'))
   assert.ok(inject.includes('timer'))
+})
+
+test('adaptive observation refresh gate follows GUI attention', () => {
+  const now = 1_000_000_000_000
+  // Tiers: a steady client poll stream (60s sidebar entry) maps to 2 minutes,
+  // an isolated call after a reopen lull to 5 minutes.
+  assert.equal(OBSERVATION_REFRESH_ACTIVE_MS, 2 * 60_000)
+  assert.equal(OBSERVATION_REFRESH_LULL_MS, 5 * 60_000)
+  assert.equal(CLIENT_POLL_STREAM_MS, 90_000)
+
+  // Cold start (never refreshed): due in both modes.
+  assert.equal(observationRefreshDue({ lastRefreshAt: 0, pollerActive: false, now }).due, true)
+  assert.equal(observationRefreshDue({ lastRefreshAt: 0, pollerActive: true, now }).due, true)
+
+  // Active GUI poller: 2-minute cadence — not due at 90s, due at 2 minutes.
+  const active = { lastRefreshAt: now, pollerActive: true }
+  assert.equal(observationRefreshDue({ ...active, now: now + 90_000 }).due, false)
+  assert.equal(observationRefreshDue({ ...active, now: now + 2 * 60_000 }).due, true)
+  assert.equal(observationRefreshDue({ ...active, now: now + 2 * 60_000 }).minIntervalMs, OBSERVATION_REFRESH_ACTIVE_MS)
+
+  // Isolated call after a lull (GUI just reopened): not due at 2 minutes,
+  // due from 5 minutes — the reopen-immediately case.
+  const lull = { lastRefreshAt: now, pollerActive: false }
+  assert.equal(observationRefreshDue({ ...lull, now: now + 2 * 60_000 }).due, false)
+  assert.equal(observationRefreshDue({ ...lull, now: now + 5 * 60_000 }).due, true)
+  assert.equal(observationRefreshDue({ ...lull, now: now + 5 * 60_000 }).minIntervalMs, OBSERVATION_REFRESH_LULL_MS)
 })
 
 test('an existing Ollama Cloud credential provisions its missing selectable model route at startup', async () => {
@@ -347,6 +377,38 @@ test('apply imports history, serves the loopback channel, and folds live events'
     assert.equal(unknown.ok, false)
   } finally {
     cleanup()
+    delete process.env.DSH_HOME
+  }
+})
+
+test('summary claims an existing GLM template account for the glm connection', async () => {
+  // Regression: a user-created GLM account kept connection_id NULL forever,
+  // so connection-keyed official observations never reached it and the
+  // refresh button appeared to do nothing.
+  const env = tempHome()
+  process.env.DSH_HOME = env.home
+  try {
+    const { ctx, channels } = fakeCtx({ credentialValues: { ZAI_CODING_CN_API_KEY: 'zk-test' } })
+    apply(ctx, { providerProxy: false })
+    await settle()
+    const accountChannel = channels.get('/account-usage')
+
+    const created = await accountChannel.handler('save-account', {
+      account: { name: 'GLM Coding Plan', templateId: 'glm-coding-plan', providerId: 'glm' },
+    })
+    assert.equal(created.ok, true)
+    assert.equal(
+      (await accountChannel.handler('accounts', {})).value.accounts.find((entry) => entry.id === created.value.id).connectionId,
+      null,
+    )
+
+    const summary = await accountChannel.handler('summary', {})
+    assert.equal(summary.ok, true)
+    const linked = (await accountChannel.handler('accounts', {})).value.accounts.find((entry) => entry.id === created.value.id)
+    assert.equal(linked.connectionId, 'glm:default')
+    assert.equal(linked.archived, false)
+  } finally {
+    env.cleanup()
     delete process.env.DSH_HOME
   }
 })

@@ -840,6 +840,82 @@ test('a later empty official_response does not hide an earlier official_ui obser
   }
 })
 
+test('a template account without a link is claimed by its provider connection so official windows reach it', () => {
+  // Regression: a wizard-created GLM account kept connection_id NULL forever,
+  // so glm:default observations (56% / 98%) never rendered and 刷新观察 looked
+  // broken. The claim must link the account and be idempotent.
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const now = Date.UTC(2026, 7, 30, 12)
+    const saved = service.saveAccount({ name: 'GLM Coding Plan', templateId: 'glm-coding-plan', providerId: 'glm' })
+    assert.equal(service.listAccounts().find((item) => item.id === saved.id).connectionId, null)
+
+    const linked = service.linkAccountConnection({ providerId: 'glm', connectionId: 'glm:default' })
+    assert.equal(linked.linked, true)
+    assert.equal(linked.id, saved.id)
+    assert.equal(service.listAccounts().find((item) => item.id === saved.id).connectionId, 'glm:default')
+
+    const repeat = service.linkAccountConnection({ providerId: 'glm', connectionId: 'glm:default' })
+    assert.equal(repeat.linked, false)
+
+    service.saveAccountObservation({
+      id: `glm:glm:default:${now}`, providerId: 'glm', connectionId: 'glm:default',
+      observedAt: now, source: 'official_plugin_internal_api', brittle: true, complete: true,
+      windows: [{ id: 'glm-window:5', kind: 'rolling', label: '5小时', durationMs: 18_000_000, resetsAt: now + 3_600_000 }],
+      limits: [{ id: 'glm-limit:5', windowId: 'glm-window:5', metric: 'TOKENS_LIMIT', unit: 'count', mode: 'dynamic', percentUsed: 56, observedAt: now }],
+      warnings: [], metadata: null,
+    })
+    const pools = service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now: now + 1_000 })
+    const glm = pools.pools.pools.find((pool) => pool.id === saved.id)
+    assert.equal(glm.official.sourceKind, 'official_plugin_internal_api')
+    assert.equal(glm.officialUsedPct, 56)
+    const detail = service.inspect({ kind: 'pool', id: saved.id, filter: { timezone: 'UTC' }, now: now + 1_000 })
+    assert.equal(detail.account.official.windows[0].percentUsed, 56)
+
+    // Archived accounts are never claimed.
+    service.archiveAccount(saved.id, { archived: true })
+    service.saveAccount({ name: 'GLM Coding Plan II', templateId: 'glm-coding-plan', providerId: 'glm' })
+    const claimed = service.linkAccountConnection({ providerId: 'glm', connectionId: 'glm:default' })
+    assert.equal(claimed.linked, true)
+    assert.notEqual(claimed.id, saved.id)
+  } finally {
+    service.dispose()
+  }
+})
+
+test('a fresh observation is visible to pool summaries immediately, not one cache bucket late', () => {
+  // Regression: saveAccountObservation never bumped the analytics revision,
+  // so the revision-keyed pools cache served the pre-refresh official
+  // percentages until the next 15-second bucket rolled over — the detail
+  // refresh followed by "go back" showed a stale progress bar.
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const bucketStart = 1_800_000 // both reads stay inside the same 15s bucket
+    const account = service.ensureConnectionAccount(
+      { providerId: 'ollama-cloud', displayName: 'Ollama Cloud', configured: true },
+      { aliases: ['ollama-cloud', 'ollama'] },
+    )
+    const observation = (id, percentUsed, observedAt) => ({
+      id: `ollama-cloud-ui:${id}`, providerId: 'ollama-cloud', connectionId: 'ollama-cloud:default',
+      observedAt, source: 'official_ui', brittle: true, complete: true, quotaApplicable: true,
+      windows: [{ id: 'ollama-cloud-window:weekly', kind: 'rolling', label: 'Weekly', durationMs: 604_800_000, resetsAt: observedAt + 6 * DAY }],
+      limits: [{ id: 'ollama-cloud-limit:weekly', windowId: 'ollama-cloud-window:weekly', metric: 'cloud_usage', unit: 'percent', mode: 'dynamic', percentUsed, observedAt }],
+      warnings: [], metadata: null,
+    })
+    service.saveAccountObservation(observation('before', 20, bucketStart))
+    const readAt = (ms) => service.query({ filter: { timezone: 'UTC' }, views: ['pools'], now: ms })
+      .pools.pools.find((pool) => pool.id === account.id).officialUsedPct
+    assert.equal(readAt(bucketStart + 1_000), 20)
+
+    service.saveAccountObservation(observation('after', 64, bucketStart + 2_000))
+    assert.equal(readAt(bucketStart + 3_000), 64, 'same-bucket pool read must observe the just-saved refresh')
+    assert.equal(service.inspect({ kind: 'pool', id: account.id, filter: { timezone: 'UTC' }, now: bucketStart + 4_000 })
+      .account.official.windows[0].percentUsed, 64)
+  } finally {
+    service.dispose()
+  }
+})
+
 test('Ollama Cloud cost uses the configured cache scenario in totals and account detail', () => {
   const service = createLedgerService({
     databasePath: ':memory:',
