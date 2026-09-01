@@ -716,6 +716,48 @@ test('live assistant messages retain connection provenance in request views', ()
   }
 })
 
+test('stock DSH replay response ids retain plugin-owned connection provenance', () => {
+  const service = createLedgerService({ databasePath: ':memory:' })
+  try {
+    const connectionId = 'connection-b'
+    const responseId = `chatcmpl-dsh-antigravity-v1.${Buffer.from(connectionId).toString('base64url')}.fixture`
+    const header = { version: 0, id: 'live-replay-connection', createdAt: T0, cwd: '/w/a' }
+    service.ingestEvent(header, {
+      type: 'assistant/message', seq: 1, time: T0 + 1,
+      data: {
+        turn: 0, step: 0,
+        message: {
+          source: {
+            kind: 'model', provider: 'antigravity', model: 'gemini',
+            replayState: {
+              response: { kind: 'pi-ai', version: 2, api: 'openai-completions', provider: 'antigravity', responseId },
+              blocks: [{ type: 'text' }],
+            },
+          },
+        },
+        usage: { inputTokens: 12, outputTokens: 3 },
+      },
+    })
+    service.ingestEvent(header, {
+      type: 'assistant/message', seq: 2, time: T0 + 2,
+      data: {
+        turn: 0, step: 0,
+        message: { source: { kind: 'model', provider: 'antigravity', model: 'gemini' } },
+        usage: { inputTokens: 12, outputTokens: 3 },
+      },
+    })
+
+    const result = service.query({
+      filter: { timezone: 'UTC', time: { preset: 'all' } },
+      views: ['page'],
+      page: { entity: 'request', limit: 10 },
+    })
+    assert.equal(result.page.rows[0].connectionId, connectionId)
+  } finally {
+    service.dispose()
+  }
+})
+
 test('connection-account reconciliation removes stale system attribution rules', () => {
   const service = createLedgerService({ databasePath: ':memory:' })
   try {

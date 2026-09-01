@@ -33,7 +33,7 @@ The profile-private durable account of model calls observable by DSH, including 
 _Avoid_: Provider usage, bill
 
 **Connection Provenance**:
-The optional opaque Connection identifier observed on the successful model response and stored as an immutable request fact. It names the final Connection after failover; a missing value stays unknown.
+The optional opaque Connection identifier carried by the plugin-owned successful model response and stored as an immutable request fact. Antigravity encodes it in the standard OpenAI response identifier that stock DSH already retains as adapter replay metadata. It names the final Connection after failover; a missing or unsupported replay value stays unknown.
 _Avoid_: Current account, inferred account
 
 **Attribution Rule**:

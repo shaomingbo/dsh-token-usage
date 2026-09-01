@@ -31,7 +31,7 @@ npx --yes github:shaomingbo/dsh-token-usage#v5.0.18 --source link:$PWD
 
 整个交互是一条动线：侧栏入口 → dock → 总览 → 每账户洞察。
 
-- **零配置账户：** 每个已配置连接（ChatGPT/Codex、Grok、每个 Antigravity 账号、GLM、Ollama Local/Cloud）出现时即自动成为一条 `account_products` 记录并带默认归因规则。Antigravity 规则使用代理盖章的精确连接，包括配额故障转移后的最终账户；已归档的自动账户不会被重建。
+- **零配置账户：** 每个已配置连接（ChatGPT/Codex、Grok、每个 Antigravity 账号、GLM、Ollama Local/Cloud）出现时即自动成为一条 `account_products` 记录并带默认归因规则。Antigravity 代理把配额故障转移后的最终连接写入带版本的 OpenAI 响应标识；账本从原装 DSH 已有的 pi-ai replay 元数据恢复它，不需要修改 DSH 源码。已归档的自动账户不会被重建。
 - **官方优先的表盘：** CodexBar 式的窗口百分比条（主窗口 5h、周窗口、每日、订阅期）带重置倒计时、来源徽标（官方接口 / 官方页面（脆弱）/ 本地账本 / 用户估计）与观察时间。本地账本绝不把官方百分比换算成 token 猜测；积分/百分比额度只来自官方观察。
 - **简单配置：** host 侧产品模板目录（`lib/accounts/templates.json`，启动时 seed 进 `provider_templates`）预填窗口、精确值（GLM 套餐积分、阿里云请求上限、Gemini 每日请求数）和 provider 别名；向导根据账本实测流量给建账户建议；高级表单仍支持自定义额度、价格、余额与规则。
 - **诚实的本地半边：** 每个账户的 DSH 观察用量（等值 $、新计算 token、请求数、模型表、30 天趋势），外推明确标注为算术平均速率而非预测。
