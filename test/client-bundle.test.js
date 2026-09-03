@@ -12,6 +12,7 @@ function loadClientHarness() {
     useEffect: () => {},
     useCallback: (fn) => fn,
     useMemo: (fn) => fn(),
+    useRef: (initial) => ({ current: initial }),
   }
   const registrations = []
   const injected = []
@@ -158,6 +159,7 @@ test('v5 components render against a mocked host without throwing', async () => 
     useEffect: () => {},
     useCallback: (fn) => fn,
     useMemo: (fn) => fn(),
+    useRef: (initial) => ({ current: initial }),
   }
   const emptyMeasures = () => ({
     requests: 0, calls: 0, failedRequests: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
@@ -337,4 +339,595 @@ test('fullscreen panel: styled account tabs, sub-card strip and stable stack col
   assert.match(source, /const dimOthers = state\.stack === 'pool' && state\.account !== null \? \(id\) => id !== state\.account : null/)
   assert.ok(!source.includes("opacity: dim ? 0.22 : 1"), 'the near-invisible 0.22 dim made dominant models read as wrong colors')
   assert.match(source, /opacity: dim \? 0\.3 : 1/)
+})
+
+// ---------------------------------------------------------------------------
+// Hook-level harness. A miniature React runtime with real useState/useRef/
+// useCallback/useEffect semantics (deps-aware, cleanups, path-keyed
+// instances), a manual clock driving the poll timers, and a controllable
+// document.visibilityState. This is what lets the tests below prove the
+// usePoll/useAsync/summary-sharing behavior without a DOM renderer or any
+// new dependency.
+// ---------------------------------------------------------------------------
+
+const flushMicrotasks = async () => {
+  for (let round = 0; round < 8; round += 1) await new Promise((resolve) => setImmediate(resolve))
+}
+
+function createClock() {
+  const pending = new Map()
+  let seq = 0
+  return {
+    setTimeout: (fn) => { seq += 1; pending.set(seq, fn); return seq },
+    clearTimeout: (id) => { pending.delete(id) },
+    size: () => pending.size,
+    // Fire every timer pending at entry exactly once, then drain the
+    // microtask chains those firings started. Timers scheduled by those
+    // chains wait for the next advance.
+    async advance() {
+      const due = [...pending.values()]
+      pending.clear()
+      for (const fn of due) fn()
+      await flushMicrotasks()
+    },
+  }
+}
+
+function createDocumentMock() {
+  const listeners = new Map()
+  return {
+    visibilityState: 'visible',
+    addEventListener: (type, fn) => {
+      if (!listeners.has(type)) listeners.set(type, new Set())
+      listeners.get(type).add(fn)
+    },
+    removeEventListener: (type, fn) => { listeners.get(type)?.delete(fn) },
+    emit: (type) => { for (const fn of [...(listeners.get(type) ?? [])]) fn() },
+    listenerCount: (type) => (listeners.get(type)?.size ?? 0),
+    querySelector: () => null,
+  }
+}
+
+function createStorageMock(entries = []) {
+  const backing = new Map(entries)
+  return {
+    getItem: (key) => (backing.has(key) ? backing.get(key) : null),
+    setItem: (key, value) => { backing.set(key, String(value)) },
+    removeItem: (key) => { backing.delete(key) },
+  }
+}
+
+function createHookRuntime() {
+  const slots = new Map()
+  let bornSeq = 0
+  let pass = 0
+  let pathKey = ''
+  let cursor = 0
+  let queuedCleanups = []
+  let queuedEffects = []
+
+  const depsEqual = (a, b) => Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((value, index) => value === b[index])
+
+  const takeSlot = () => {
+    const key = `${pathKey}#${cursor}`
+    cursor += 1
+    let slot = slots.get(key)
+    if (!slot) {
+      slot = { key, deps: undefined, value: undefined, cleanup: null, seen: -1, born: bornSeq++ }
+      slots.set(key, slot)
+    }
+    slot.seen = pass
+    return slot
+  }
+
+  const React = {
+    createElement: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+    useState(initial) {
+      const slot = takeSlot()
+      if (slot.value === undefined) slot.value = { current: typeof initial === 'function' ? initial() : initial }
+      const box = slot.value
+      return [box.current, (patch) => { box.current = typeof patch === 'function' ? patch(box.current) : patch }]
+    },
+    useRef(initial) {
+      const slot = takeSlot()
+      if (slot.value === undefined) slot.value = { current: initial }
+      return slot.value
+    },
+    useCallback(fn, deps) {
+      const slot = takeSlot()
+      if (slot.value === undefined || !depsEqual(slot.deps, deps)) { slot.value = fn; slot.deps = deps }
+      return slot.value
+    },
+    useMemo(fn, deps) {
+      const slot = takeSlot()
+      if (slot.value === undefined || !depsEqual(slot.deps, deps)) { slot.value = fn(); slot.deps = deps }
+      return slot.value
+    },
+    useEffect(fn, deps) {
+      const slot = takeSlot()
+      if (!depsEqual(slot.deps, deps)) {
+        if (slot.cleanup !== null) queuedCleanups.push(slot)
+        slot.deps = deps
+        queuedEffects.push({ slot, fn })
+      }
+    },
+  }
+
+  const renderElement = (element, location) => {
+    if (element === null || element === undefined || typeof element !== 'object') return element
+    if (Array.isArray(element)) return element.map((child, index) => renderElement(child, [...location, index]))
+    if (typeof element.type !== 'function') {
+      return { ...element, children: (element.children ?? []).map((child, index) => renderElement(child, [...location, index])) }
+    }
+    const name = element.type.name ?? 'anon'
+    const parentKey = pathKey
+    const parentCursor = cursor
+    pathKey = JSON.stringify([...location, name])
+    cursor = 0
+    let output
+    try {
+      output = element.type(element.props ?? {})
+    } finally {
+      pathKey = parentKey
+      cursor = parentCursor
+    }
+    const branches = Array.isArray(output) ? output : [output]
+    return { type: name, props: element.props, children: branches.map((child, index) => renderElement(child, [...location, name, index])) }
+  }
+
+  const flush = () => {
+    const cleanups = queuedCleanups
+    const effects = queuedEffects
+    queuedCleanups = []
+    queuedEffects = []
+    for (const slot of cleanups) {
+      const cleanup = slot.cleanup
+      slot.cleanup = null
+      if (cleanup) cleanup()
+    }
+    for (const { slot, fn } of effects) slot.cleanup = fn() ?? null
+  }
+
+  const sweep = () => {
+    for (const [key, slot] of [...slots]) {
+      if (slot.seen < pass) {
+        if (slot.cleanup !== null) {
+          const cleanup = slot.cleanup
+          slot.cleanup = null
+          cleanup()
+        }
+        slots.delete(key)
+      }
+    }
+  }
+
+  return {
+    React,
+    render: (component, props) => {
+      pass += 1
+      const tree = renderElement(React.createElement(component, props), [0])
+      flush()
+      sweep()
+      return tree
+    },
+    unmountAll: () => {
+      for (const [key, slot] of [...slots].sort((a, b) => a[1].born - b[1].born)) {
+        if (slot.cleanup !== null) {
+          const cleanup = slot.cleanup
+          slot.cleanup = null
+          cleanup()
+        }
+        slots.delete(key)
+      }
+    },
+  }
+}
+
+function createHookHarness({ controlled = [], responses = new Map() } = {}) {
+  const runtime = createHookRuntime()
+  const clock = createClock()
+  const doc = createDocumentMock()
+  const rpcCalls = []
+  const pendingByEndpoint = new Map()
+  const call = (channel, endpoint, payload) => {
+    rpcCalls.push({ channel, endpoint, payload })
+    const key = `${channel}:${endpoint}`
+    if (controlled.includes(key)) {
+      return new Promise((resolve, reject) => {
+        if (!pendingByEndpoint.has(key)) pendingByEndpoint.set(key, [])
+        pendingByEndpoint.get(key).push({ resolve, reject, payload })
+      })
+    }
+    const value = responses.get(key)
+    if (value === undefined) return Promise.resolve({ ok: false, error: { code: 'missing', message: `unmapped ${key}` } })
+    return Promise.resolve({ ok: true, value: typeof value === 'function' ? value(payload) : value })
+  }
+  const registrations = []
+  const ctx = {
+    slots: {
+      inject: (name, register) => register(),
+      register: (definition, component) => { registrations.push({ definition, component }); return () => {} },
+    },
+    connection: { rpc: { call }, api: { credentials: { set: async () => ({ result: { ok: true } }) } } },
+    locale: undefined,
+    effect: (fn) => fn(),
+  }
+  let bundle
+  const require = (name) => {
+    if (name === 'react') return runtime.React
+    throw new Error(`unexpected client dependency: ${name}`)
+  }
+  const windowMock = {
+    __ModuleLoader__: { load: (loaded) => { bundle = loaded } },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    open: () => {},
+  }
+  new Function('window', 'require', source)(windowMock, require)
+  bundle.factory(require).apply(ctx)
+  const findComponent = (name) => registrations.find(({ definition }) => definition.name === name).component
+  return {
+    runtime,
+    clock,
+    doc,
+    ctx,
+    registrations,
+    store: findComponent('shell.overlay')({}).props.store,
+    overlayComponent: findComponent('shell.overlay'),
+    entryComponent: findComponent('sidebar.footer.action'),
+    rpcCalls,
+    pending: (key) => pendingByEndpoint.get(key) ?? [],
+    count: (endpoint) => rpcCalls.filter((entry) => entry.endpoint === endpoint).length,
+  }
+}
+
+function installClientGlobals({ clock, doc }) {
+  const previous = {
+    document: globalThis.document,
+    localStorage: globalThis.localStorage,
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+  }
+  globalThis.document = doc
+  globalThis.localStorage = createStorageMock()
+  globalThis.setTimeout = clock.setTimeout
+  globalThis.clearTimeout = clock.clearTimeout
+  return () => {
+    globalThis.document = previous.document
+    globalThis.localStorage = previous.localStorage
+    globalThis.setTimeout = previous.setTimeout
+    globalThis.clearTimeout = previous.clearTimeout
+  }
+}
+
+// ---- shared RPC fixtures for the hook harness ----
+const harnessMeasures = () => ({
+  requests: 0, calls: 0, failedRequests: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
+  cacheWriteTokens: 0, reasoningTokens: 0, processingTokens: 0, newComputeTokens: 0,
+  cost: { originalUsdNano: 0, currentUsdNano: 0, coverage: 1, pricedTokens: 0, totalTokens: 0 },
+})
+const harnessPool = (id, name) => ({
+  id, name, kind: 'subscription', sourceKind: 'connection', providerId: 'openai-codex',
+  connectionId: id, color: '#3d6ee8', limits: [], quotaWindows: [], kpis: harnessMeasures(),
+  usedPct: 42, localUsedPct: null, officialUsedPct: 42, pace: null, billing: null,
+  official: { observedAt: 1_800_000_000_000, sourceKind: 'official_usage_api', brittle: false, windows: [] },
+})
+const harnessQueryPayload = () => ({
+  kpis: harnessMeasures(),
+  pools: {
+    configured: true,
+    month: { elapsedPct: 50, daysLeft: 15, resetLabel: '2026-09-01' },
+    pools: [harnessPool('connection:openai-codex:default', 'ChatGPT Plus/Pro')],
+    unassigned: null,
+    tightestPoolId: 'connection:openai-codex:default',
+  },
+  seriesBy: { groups: [], days: [] },
+  rankings: { rows: [] },
+  window: {},
+  asOf: {},
+})
+const harnessSummaryPayload = () => ({
+  product: { name: 'DSH Accounts & Usage' },
+  connections: [],
+  modelCatalogs: [],
+  antigravity: null,
+  privacy: {},
+})
+const harnessInspectPayload = (name) => ({
+  kind: 'pool',
+  id: name,
+  identity: {
+    name, color: null, kind: 'subscription', providerId: 'openai-codex',
+    connectionId: 'connection:openai-codex:default', sourceKind: 'connection', billing: null, declaredLimits: [], rules: [],
+  },
+  account: null,
+  direct: harnessMeasures(),
+  trend: { buckets: [] },
+  breakdown: { rows: [] },
+  page: { entity: 'request', rows: [], nextCursor: null },
+})
+const harnessEntrySummaryPayload = () => ({
+  configured: true,
+  month: { elapsedPct: 50, daysLeft: 15, resetLabel: '2026-09-01' },
+  tightest: { id: 'x', name: 'Grok / X subscription', color: null, usedPct: 70, sourceKind: 'official_usage_api', windowLabel: 'weekly', resetsAt: Date.now() + 3_600_000 },
+  pools: [],
+})
+
+test('usePoll: runs never overlap, pause while hidden, resume visibly, stop on unmount', async () => {
+  const harness = createHookHarness({
+    controlled: ['/token-usage:entry-summary'],
+    responses: new Map([['/token-usage:settings', { settings: {} }]]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, clock, doc, entryComponent, pending, count } = harness
+    const resolveEntrySummary = () => {
+      // Controlled deferreds resolve with the RPC envelope, like the host.
+      for (const entry of pending('/token-usage:entry-summary').splice(0)) entry.resolve({ ok: true, value: harnessEntrySummaryPayload() })
+    }
+
+    runtime.render(entryComponent, { wide: true })
+    await flushMicrotasks()
+    // Mount: the poll fires immediately (entry-summary) and settings are
+    // pulled exactly once; overview is never requested.
+    assert.equal(count('entry-summary'), 1)
+    assert.equal(count('settings'), 1)
+    assert.equal(count('overview'), 0)
+
+    // The first run is still in flight: time can pass but nothing re-runs.
+    await clock.advance()
+    assert.equal(count('entry-summary'), 1, 'a pending run must not overlap')
+
+    // Only after the run settles is the next one scheduled.
+    resolveEntrySummary()
+    await flushMicrotasks()
+    await clock.advance()
+    assert.equal(count('entry-summary'), 2)
+
+    // Settle run #2: the next tick is now armed as a pending timer.
+    resolveEntrySummary()
+    await flushMicrotasks()
+
+    // Hidden tab: the pending timer is dropped and the cycle pauses.
+    doc.visibilityState = 'hidden'
+    doc.emit('visibilitychange')
+    await clock.advance()
+    await clock.advance()
+    assert.equal(count('entry-summary'), 2, 'no runs while hidden')
+
+    // Becoming visible fires exactly one immediate run.
+    doc.visibilityState = 'visible'
+    doc.emit('visibilitychange')
+    await flushMicrotasks()
+    assert.equal(count('entry-summary'), 3, 'visible resumes with one immediate run')
+    resolveEntrySummary()
+    await flushMicrotasks()
+
+    // Unmount stops the cycle and clears the timer and the listener.
+    runtime.unmountAll()
+    assert.equal(clock.size(), 0, 'no pending timer after unmount')
+    assert.equal(doc.listenerCount('visibilitychange'), 0, 'visibility listener removed')
+    resolveEntrySummary()
+    await clock.advance()
+    assert.equal(count('entry-summary'), 3, 'no runs after unmount')
+    assert.equal(count('settings'), 1, 'settings are not polled')
+    assert.equal(count('overview'), 0, 'overview is never requested')
+  } finally {
+    restore()
+  }
+})
+
+test('DataTab pulls import status on mount and polls only while an import runs', async () => {
+  const harness = createHookHarness({
+    controlled: ['/token-usage:import-status'],
+    responses: new Map([
+      ['/token-usage:import-control', { running: true, done: 0, total: 0, errors: 0, paused: false, canceled: false, lastError: null }],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, clock, overlayComponent, store, pending, count } = harness
+    const resolveStatus = (running) => {
+      for (const entry of pending('/token-usage:import-status').splice(0)) {
+        entry.resolve({ ok: true, value: { running, done: 1, total: 2, errors: 0, paused: false, canceled: false, lastError: null } })
+      }
+    }
+    const findButton = (tree, label) => {
+      let found = null
+      const walk = (node) => {
+        if (found || node === null || node === undefined || typeof node !== 'object') return
+        if (Array.isArray(node)) { node.forEach(walk); return }
+        if (node.type === 'button' && JSON.stringify(node.children ?? []).includes(`"${label}"`)) found = node
+        ;(node.children ?? []).forEach(walk)
+      }
+      walk(tree)
+      return found
+    }
+
+    store.update({ open: true, mode: 'dash', dataSection: 'data' })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    // Mount pulls once; with no import running the poll stays disabled.
+    assert.equal(count('import-status'), 1)
+    resolveStatus(false)
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    await clock.advance()
+    assert.equal(count('import-status'), 1, 'idle tab must not poll')
+
+    // A scan control action re-arms the poll with an immediate pull.
+    const rescan = findButton(runtime.render(overlayComponent, {}), 'Rescan')
+    assert.ok(rescan, 'rescan button rendered')
+    rescan.props.onClick()
+    await flushMicrotasks()
+    assert.equal(count('import-control'), 1, 'scan action reaches import-control')
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('import-status'), 2, 'poll re-arms with an immediate pull')
+
+    // While running, the chained poll keeps cycling.
+    resolveStatus(true)
+    await flushMicrotasks()
+    await clock.advance()
+    assert.equal(count('import-status'), 3)
+
+    // When the import finishes the poll stops by itself.
+    resolveStatus(false)
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    await clock.advance()
+    assert.equal(count('import-status'), 3, 'no polling once the import is idle')
+    runtime.unmountAll()
+    assert.equal(clock.size(), 0, 'no pending timer after unmount')
+  } finally {
+    restore()
+  }
+})
+
+test('sidebar entry pulls settings once on mount (plus revision bumps), never periodically', async () => {
+  const harness = createHookHarness({
+    responses: new Map([
+      ['/token-usage:entry-summary', harnessEntrySummaryPayload()],
+      ['/token-usage:settings', { settings: {} }],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, clock, entryComponent, store, count } = harness
+    runtime.render(entryComponent, { wide: true })
+    await flushMicrotasks()
+    runtime.render(entryComponent, { wide: true })
+    assert.equal(count('settings'), 1)
+    assert.equal(count('overview'), 0)
+
+    // Several poll cycles later: entry-summary advanced, settings did not.
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      await clock.advance()
+      await flushMicrotasks()
+    }
+    assert.ok(count('entry-summary') >= 4, `entry-summary keeps polling (got ${count('entry-summary')})`)
+    assert.equal(count('settings'), 1, 'settings must not be polled periodically')
+
+    // A settings save elsewhere bumps the revision; the entry refreshes once.
+    store.update({ settingsRevision: (store.state.settingsRevision ?? 0) + 1 })
+    runtime.render(entryComponent, { wide: true })
+    await flushMicrotasks()
+    assert.equal(count('settings'), 2, 'revision bump refetches settings once')
+    await clock.advance()
+    await flushMicrotasks()
+    assert.equal(count('settings'), 2, 'and still no periodic settings polling')
+
+    // Plain mode renders the title only — and still never calls overview.
+    store.update({ settingsData: { sidebarSummary: 'plain' } })
+    const tree = runtime.render(entryComponent, { wide: true })
+    await flushMicrotasks()
+    const json = JSON.stringify(tree)
+    assert.ok(json.includes('Accounts & Usage'), 'plain mode shows the entry title')
+    assert.ok(json.includes('↗'), 'plain mode keeps the open affordance')
+    assert.ok(!json.includes('tu3-entry-b1'), 'plain mode has no level bar')
+    assert.equal(count('overview'), 0, 'overview dead path is gone in plain mode')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('useAsync: a stale response never overwrites the latest one', async () => {
+  const harness = createHookHarness({
+    controlled: ['/token-usage:inspect'],
+    responses: new Map([
+      ['/token-usage:query', harnessQueryPayload()],
+      ['/account-usage:summary', harnessSummaryPayload()],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, overlayComponent, store, pending, count } = harness
+    const resolveInspect = (id, name) => {
+      const queue = pending('/token-usage:inspect')
+      const entry = queue.find((item) => item.payload?.id === id)
+      assert.ok(entry, `expected an in-flight inspect for ${id}`)
+      queue.splice(queue.indexOf(entry), 1)
+      entry.resolve({ ok: true, value: harnessInspectPayload(name) })
+    }
+
+    store.update({ open: true, mode: 'dash', account: 'account-a' })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('inspect'), 1)
+    assert.equal(pending('/token-usage:inspect')[0].payload.id, 'account-a')
+
+    // Switch accounts while the first inspect is still in flight.
+    store.update({ account: 'account-b' })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('inspect'), 2)
+
+    // The newer request (B) resolves first, then the stale one (A) lands.
+    resolveInspect('account-b', 'Identity B')
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    resolveInspect('account-a', 'Identity A')
+    await flushMicrotasks()
+    const tree = runtime.render(overlayComponent, {})
+    const json = JSON.stringify(tree)
+    assert.ok(json.includes('Identity B'), 'the latest response wins')
+    assert.ok(!json.includes('Identity A'), 'the stale response is dropped')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('one overlay open issues exactly one account summary RPC', async () => {
+  const harness = createHookHarness({
+    responses: new Map([
+      ['/token-usage:query', harnessQueryPayload()],
+      ['/account-usage:summary', harnessSummaryPayload()],
+      ['/account-usage:inspect', harnessInspectPayload('ChatGPT Plus/Pro')],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, overlayComponent, store, count } = harness
+    store.update({ open: true, mode: 'dash', account: null })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('summary'), 1, 'first open fires summary exactly once')
+
+    // Opening an account detail mounts a ConnectionSection: it must reuse the
+    // shared session instead of firing its own summary.
+    store.update({ account: 'connection:openai-codex:default' })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('summary'), 1, 'dashboard and ConnectionSection share one summary')
+
+    // Switching to the dock within the same open session shares it too.
+    store.update({ mode: 'dock' })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('summary'), 1, 'DockPanel joins the same shared summary session')
+
+    // Closing ends the session; reopening refetches exactly once.
+    store.update({ open: false })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    store.update({ open: true, mode: 'dash', account: 'connection:openai-codex:default' })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('summary'), 2, 'the next open session refires summary once')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
 })
