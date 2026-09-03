@@ -886,11 +886,13 @@ test('a template account without a link is claimed by its provider connection so
 test('a fresh observation is visible to pool summaries immediately, not one cache bucket late', () => {
   // Regression: saveAccountObservation never bumped the analytics revision,
   // so the revision-keyed pools cache served the pre-refresh official
-  // percentages until the next 15-second bucket rolled over — the detail
-  // refresh followed by "go back" showed a stale progress bar.
+  // percentages until the next clock bucket rolled over — the detail
+  // refresh followed by "go back" showed a stale progress bar. Observations
+  // bump the combined revision only; the projection rebuild is reserved for
+  // projection changes (see test/analytics-caching.test.js).
   const service = createLedgerService({ databasePath: ':memory:' })
   try {
-    const bucketStart = 1_800_000 // both reads stay inside the same 15s bucket
+    const bucketStart = 1_800_000 // both reads stay inside the same 60s bucket
     const account = service.ensureConnectionAccount(
       { providerId: 'ollama-cloud', displayName: 'Ollama Cloud', configured: true },
       { aliases: ['ollama-cloud', 'ollama'] },
