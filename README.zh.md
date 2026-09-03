@@ -71,6 +71,8 @@ npm run check
 npm pack --dry-run
 ```
 
+`npm run bench:v2` 是仅开发用的分析基准，不随包发布。
+
 测试只使用合成数据和临时 `DSH_HOME`。当前能力针对原装 DSH 0.1.1-rc.2、DSH 0.1.2-alpha.2 与 Node 22.19+ 验证，不宣称更广兼容性。
 
 ## 许可证

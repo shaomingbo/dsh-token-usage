@@ -101,3 +101,75 @@ test('user override remains highest precedence', () => {
   assert.equal(value.usdNano, 2800)
   assert.equal(value.source, 'override')
 })
+
+test('refreshed prices beat the bundled snapshot on every catalog matching path', () => {
+  const snapshot = {
+    version: 1,
+    models: {
+      'exact-model': { inputNano: 100, outputNano: 100 },
+      'normalized-model-2026-01-01': { inputNano: 100, outputNano: 100 },
+      'zai/glm-5.3': { inputNano: 100, outputNano: 100 },
+      'alias/target': { inputNano: 100, outputNano: 100 },
+      'snapshot-only-model': { inputNano: 700, outputNano: 700 },
+    },
+  }
+  const updates = new Map([
+    ['exact-model', { inputNano: 200, outputNano: 200 }],
+    ['normalized-model-2026-02-02', { inputNano: 200, outputNano: 200 }],
+    ['zai/glm-5.3', { inputNano: 200, outputNano: 200 }],
+    ['alias/target', { inputNano: 200, outputNano: 200, source: 'models-dev-refresh' }],
+  ])
+  const catalog = new PriceCatalog({ snapshot, updates })
+  catalog.aliases.set('raw-alias', 'alias/target')
+
+  // exact id
+  assert.equal(catalog.priceFor('exact-model', 'acme').inputNano, 200)
+  assert.equal(catalog.priceFor('exact-model', 'acme').source, 'litellm-upstream')
+  // normalized id (release-date suffix differs on both sides)
+  const normalized = catalog.priceFor('normalized-model-2026-03-03', 'acme')
+  assert.equal(normalized.matchedModel, 'normalized-model-2026-02-02')
+  assert.equal(normalized.inputNano, 200)
+  assert.equal(normalized.source, 'litellm-upstream')
+  // provider-prefixed id
+  const prefixed = catalog.priceFor('glm-5.3', 'zai-coding-cn')
+  assert.equal(prefixed.matchedModel, 'zai/glm-5.3')
+  assert.equal(prefixed.inputNano, 200)
+  assert.equal(prefixed.source, 'litellm-upstream')
+  // alias target; the refreshed layer may carry its own source label
+  const aliasTarget = catalog.priceFor('raw-alias', 'acme')
+  assert.equal(aliasTarget.matchedModel, 'alias/target')
+  assert.equal(aliasTarget.source, 'models-dev-refresh')
+  // a snapshot-only model still falls back to the snapshot
+  const snapshotOnly = catalog.priceFor('snapshot-only-model', 'acme')
+  assert.equal(snapshotOnly.inputNano, 700)
+  assert.equal(snapshotOnly.source, 'snapshot')
+  // valuation uses the refreshed price, not the snapshot price
+  const valued = valueUsage(catalog, {
+    provider: 'acme',
+    modelRaw: 'exact-model',
+    usage: { input: 2, output: 3, cacheRead: 0, cacheWrite: 0 },
+  })
+  assert.equal(valued.usdNano, 1000) // 2×200 + 3×200, not the snapshot 500
+  assert.equal(valued.source, 'litellm-upstream')
+})
+
+test('override beats both refreshed and snapshot prices, including alias targets', () => {
+  const snapshot = { version: 1, models: { 'zai/glm-5.3': { inputNano: 100, outputNano: 100 } } }
+  const updates = new Map([['zai/glm-5.3', { inputNano: 200, outputNano: 200 }]])
+  const raw = new PriceCatalog({
+    snapshot,
+    updates,
+    overrides: new Map([['zai/glm-5.3', { inputNano: 500, outputNano: 500 }]]),
+  })
+  const rawPrice = raw.priceFor('zai/glm-5.3', 'zai-coding-cn')
+  assert.equal(rawPrice.source, 'override')
+  assert.equal(rawPrice.inputNano, 500)
+
+  const aliased = new PriceCatalog({ snapshot, updates })
+  aliased.aliases.set('glm', 'zai/glm-5.3')
+  aliased.overrides.set('zai/glm-5.3', { inputNano: 500, outputNano: 500 })
+  const aliasPrice = aliased.priceFor('glm', 'zai-coding-cn')
+  assert.equal(aliasPrice.matchedModel, 'zai/glm-5.3')
+  assert.equal(aliasPrice.source, 'override')
+  assert.equal(aliasPrice.inputNano, 500)
+})

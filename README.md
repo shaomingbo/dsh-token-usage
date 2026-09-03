@@ -75,6 +75,8 @@ npm run check
 npm pack --dry-run
 ```
 
+`npm run bench:v2` is a development-only analytics benchmark and is not published with the package.
+
 Tests use synthetic data and temporary `DSH_HOME` directories. The package targets the capabilities verified against stock DSH 0.1.1-rc.2, DSH 0.1.2-alpha.2, and Node 22.19+; it does not claim broader compatibility.
 
 ## License
