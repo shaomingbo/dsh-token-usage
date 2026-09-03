@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDatabase, openDatabaseReadOnly, SCHEMA_VERSION, LedgerError } from '../lib/ledger/db.js'
 import { createLedgerService } from '../lib/ledger/service.js'
-import { AccountsStore } from '../lib/accounts/storage.js'
 
 function tempDir() {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-token-usage-mig-'))
@@ -165,9 +164,9 @@ test('v5 plans and both windows migrate losslessly as manual estimates', () => {
       ['secondary', 'manual', '5000', 'rolling', 604800],
     ])
     assert.equal(migrated.prepare("SELECT COUNT(*) AS count FROM plans WHERE id = 'p1'").get().count, 1)
-    const billing = new AccountsStore(migrated).get('billing', 'legacy-billing:p1')
-    assert.equal(billing.connectionId, null)
-    assert.equal(billing.model, 'subscription')
+    const billing = migrated.prepare("SELECT connection_id, kind FROM account_billing WHERE id = 'legacy-billing:p1'").get()
+    assert.equal(billing.connection_id, null)
+    assert.equal(billing.kind, 'subscription')
     migrated.close()
   } finally {
     env.cleanup()

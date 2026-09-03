@@ -1,9 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { openDatabase } from '../lib/ledger/db.js'
+import { createLedgerService } from '../lib/ledger/service.js'
 import {
   AccountsError,
-  AccountsStore,
   GlmAdapter,
   OllamaCloudAdapter,
   OllamaLocalAdapter,
@@ -16,6 +19,11 @@ import {
 } from '../lib/accounts/index.js'
 
 const NOW = 1_800_000_000_000
+
+function tempDir() {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-token-usage-accounts-'))
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
 
 function response({ status = 200, url, json, text }) {
   return {
@@ -398,60 +406,70 @@ test('a pasted session= cookie is also sent as __Secure-session so ollama.com do
   assert.equal(result.product.name, 'Pro')
 })
 
-test('account storage helper round-trips canonical records through the parent v6 schema', () => {
-  const db = openDatabase(':memory:')
+test('account facts round-trip through the ledger service into the parent v6 schema', () => {
+  const env = tempDir()
   try {
-    const store = new AccountsStore(db, { now: () => NOW })
-    const connection = store.put('connection', {
-      id: 'glm-main', providerId: 'glm', label: 'GLM', credentialId: 'glm-key', createdAt: NOW,
+    const dbPath = join(env.dir, 'usage.sqlite')
+    const service = createLedgerService({ databasePath: dbPath })
+    service.saveAccountConnection({
+      connectionId: 'glm-main', providerId: 'glm', displayName: 'GLM', configured: true,
+      credentialKind: 'raw_authorization', credentialRef: 'keychain:glm', updatedAt: NOW,
     })
-    assert.equal(connection.providerId, 'glm')
-    assert.deepEqual(store.get('connection', 'glm-main'), connection)
-    store.put('credential_metadata', {
-      id: 'glm-key-meta', connectionId: 'glm-main', credentialRef: 'keychain:glm',
-      kind: 'raw_authorization', scopes: ['quota:read'], updatedAt: NOW,
+    service.saveAccount({
+      id: 'glm-plan', providerId: 'glm', name: 'Coding Plan', kind: 'subscription',
+      billing: { priceUsd: 1, resetDay: 7 },
+      limits: [{ externalKey: 'primary', unit: 'tokens', valueMode: 'manual', value: 1000, windowKind: 'rolling', windowSeconds: 3_600 }],
+      rules: [{ matchProvider: 'glm*' }],
     })
-    assert.deepEqual(store.get('credential_metadata', 'glm-key-meta').scopes, ['quota:read'])
-    const product = store.put('product', {
-      id: 'glm-plan', providerId: 'glm', code: 'coding', name: 'Coding Plan',
-      sourceKind: 'official_usage_api', createdAt: NOW,
-    })
-    store.put('billing', {
-      id: 'glm-billing', connectionId: 'glm-main', productId: product.id,
-      model: 'subscription', currency: 'USD', amountNano: '1000000000',
-      sourceKind: 'official_usage_api', observedAt: NOW,
-    })
-    assert.equal(store.get('billing', 'glm-billing').amountNano, '1000000000')
-    store.put('limit', {
-      id: 'glm-limit', connectionId: 'glm-main', productId: product.id,
-      windowId: 'glm-window', window: { id: 'glm-window', kind: 'rolling', durationMs: 3_600_000 },
-      metric: 'tokens', unit: 'token', mode: 'exact', value: 1000,
-      sourceKind: 'official_usage_api', createdAt: NOW,
-    })
-    assert.equal(store.get('limit', 'glm-limit').window.durationMs, 3_600_000)
-    store.put('limit', {
-      id: 'fixed-limit', connectionId: 'glm-main', productId: product.id,
-      windowId: 'fixed-window', window: { id: 'fixed-window', kind: 'fixed', startsAt: NOW, endsAt: NOW + 1000 },
-      metric: 'requests', unit: 'count', mode: 'range', min: 10, max: 20,
-      sourceKind: 'manual', createdAt: NOW,
-    })
-    assert.deepEqual(store.get('limit', 'fixed-limit').window, normalizeRecord('window', { id: 'fixed-window', kind: 'fixed', startsAt: NOW, endsAt: NOW + 1000 }))
-    store.put('provider_template', {
-      id: 'glm-template', providerId: 'glm', name: 'GLM plan', product, limits: [],
-      sourceKind: 'manual', updatedAt: NOW,
-    })
-    const mapping = store.put('provider_mapping', {
-      id: 'new', providerId: 'glm', externalKey: 'coding', templateId: 'glm-template', createdAt: NOW,
-    })
-    assert.equal(store.get('provider_mapping', mapping.id).externalKey, 'coding')
-    store.put('observation', {
-      id: 'obs-1', providerId: 'glm', connectionId: 'glm-main', observedAt: NOW,
-      source: 'official_usage_api', complete: false, windows: [], limits: [], warnings: ['partial'],
-    })
-    assert.equal(store.list('observation', { connectionId: 'glm-main' })[0].warnings[0], 'partial')
-    assert.equal(store.remove('observation', 'obs-1'), true)
-    assert.equal(store.get('observation', 'obs-1'), null)
+    const observation = {
+      id: 'obs-1', recordType: 'observation', providerId: 'glm', connectionId: 'glm-main',
+      observedAt: NOW, source: 'official_usage_api', brittle: false, complete: true, quotaApplicable: true,
+      product: null, billing: null,
+      windows: [{ id: 'fixed-window', kind: 'fixed', label: 'fixed', startsAt: NOW, endsAt: NOW + 1000 }],
+      limits: [{ id: 'fixed-limit', connectionId: 'glm-main', windowId: 'fixed-window', metric: 'requests', unit: 'count', mode: 'range', min: 10, max: 20, observedAt: NOW }],
+      warnings: ['partial'], metadata: null,
+    }
+    service.saveAccountObservation(observation)
+    assert.deepEqual(service.listAccountObservations({ connectionId: 'glm-main' }), [observation])
+
+    const account = service.listAccounts().find((entry) => entry.id === 'glm-plan')
+    assert.equal(account.name, 'Coding Plan')
+    assert.equal(account.archived, false)
+    assert.equal(account.billing.kind, 'subscription')
+    assert.equal(account.billing.amountNano, '1000000000')
+    assert.deepEqual(account.limits, [{ id: 'account-limit:glm-plan:primary', productId: 'glm-plan', externalKey: 'primary', metric: 'quota', unit: 'tokens', valueMode: 'manual', exactValue: 1000, windowKind: 'rolling', windowSeconds: 3_600, sourceKind: 'manual' }])
+    assert.deepEqual(account.rules.map((rule) => [rule.matchProvider, rule.matchModel, rule.priority, rule.sourceKind]), [['glm*', null, 0, 'manual']])
+    service.archiveAccount('glm-plan')
+    assert.equal(service.listAccounts().find((entry) => entry.id === 'glm-plan').archived, true)
+    service.dispose()
+
+    const db = openDatabase(dbPath)
+    try {
+      const connection = db.prepare("SELECT provider_id, display_name, status, auth_kind FROM account_connections WHERE id = 'glm-main'").get()
+      assert.equal(connection.provider_id, 'glm')
+      assert.equal(connection.display_name, 'GLM')
+      assert.equal(connection.status, 'connected')
+      assert.equal(connection.auth_kind, 'raw_authorization')
+      const credential = db.prepare("SELECT connection_id, credential_ref, kind, scopes_json FROM credential_metadata WHERE id = 'glm-main:credential'").get()
+      assert.equal(credential.connection_id, 'glm-main')
+      assert.equal(credential.credential_ref, 'keychain:glm')
+      assert.equal(credential.kind, 'raw_authorization')
+      const billing = db.prepare("SELECT product_id, kind, amount_nano, cycle_anchor_day FROM account_billing WHERE id = 'account-billing:glm-plan'").get()
+      assert.equal(billing.product_id, 'glm-plan')
+      assert.equal(billing.kind, 'subscription')
+      assert.equal(billing.amount_nano, '1000000000')
+      const manualLimit = db.prepare("SELECT value_mode, exact_value, window_kind, window_seconds FROM account_limits WHERE id = 'account-limit:glm-plan:primary'").get()
+      assert.deepEqual([manualLimit.value_mode, manualLimit.exact_value, manualLimit.window_kind, manualLimit.window_seconds], ['manual', '1000', 'rolling', 3600])
+      const fixedLimit = db.prepare("SELECT value_mode, minimum_value, maximum_value, window_kind, window_seconds, window_json FROM account_limits WHERE id = 'fixed-limit'").get()
+      assert.equal(fixedLimit.value_mode, 'range')
+      assert.deepEqual([fixedLimit.minimum_value, fixedLimit.maximum_value], ['10', '20'])
+      assert.deepEqual(JSON.parse(fixedLimit.window_json), { id: 'fixed-window', kind: 'fixed', label: 'fixed', startsAt: NOW, endsAt: NOW + 1000 })
+      const stored = db.prepare("SELECT payload_json FROM account_observations WHERE id = 'obs-1'").get()
+      assert.equal(JSON.parse(stored.payload_json).warnings[0], 'partial')
+    } finally {
+      db.close()
+    }
   } finally {
-    db.close()
+    env.cleanup()
   }
 })
