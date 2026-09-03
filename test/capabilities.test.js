@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
 import { OAuthCredentialFileStore, parseOAuthDocument } from '../lib/capabilities/chatgpt-grok/oauth-store.js'
+import { chatGptGrokEnvelopeOutcome } from '../lib/capabilities/chatgpt-grok/capability.js'
 import { AuthStore, parseAuthDocument } from '../lib/capabilities/antigravity/auth-store.js'
+import { antigravityEnvelopeOutcome } from '../lib/capabilities/antigravity/capability.js'
 import { createAccountRouter, isQuotaExhaustion } from '../lib/capabilities/antigravity/account-router.js'
 import { createProxy } from '../lib/capabilities/antigravity/proxy.js'
 import { attributedResponseId, connectionIdFromAssistantSource } from '../lib/capabilities/antigravity/response-provenance.js'
@@ -14,6 +16,8 @@ import {
   antigravityRouteNeedsProvisioning,
   ensureAntigravityRoute,
 } from '../lib/capabilities/antigravity/capability.js'
+import { OwnerFileStore } from '../lib/capabilities/owner-file-store.js'
+import { createCapabilityEnvelope } from '../lib/capabilities/rpc-envelope.js'
 
 async function mode(path) {
   return (await stat(path)).mode & 0o777
@@ -214,4 +218,180 @@ test('Account router fails over only on quota exhaustion and activates successfu
   assert.equal(outcome.switched, true)
   assert.equal(active, 'b')
   assert.deepEqual(activated, ['b'])
+})
+
+test('Owner file store load distinguishes missing, invalid, and valid documents', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-kernel-'))
+  const filename = join(root, 'doc.json')
+  const invalid = []
+  const store = new OwnerFileStore({
+    path: filename,
+    parse: text => {
+      const value = JSON.parse(text)
+      if (value.broken === true) throw new Error('rejected document')
+      return value
+    },
+    onInvalid: error => invalid.push(error),
+  })
+  assert.equal(await store.load(), null)
+  await writeFile(filename, '{"broken":true}', 'utf8')
+  assert.equal(await store.load(), undefined)
+  assert.equal(invalid.length, 1)
+  await writeFile(filename, '{"answer":42}', 'utf8')
+  assert.deepEqual(await store.load(), { answer: 42 })
+})
+
+test('Owner file store serializes operations and isolates their failures', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-kernel-'))
+  const store = new OwnerFileStore({ path: join(root, 'queue.json'), parse: JSON.parse })
+  const order = []
+  const first = store.enqueue(async () => {
+    order.push('first')
+    return 'one'
+  })
+  const second = store.enqueue(async () => {
+    order.push('second')
+    throw new Error('boom')
+  })
+  const third = store.enqueue(async () => {
+    order.push('third')
+    return 'three'
+  })
+  assert.deepEqual(await Promise.all([
+    first,
+    second.then(() => 'resolved', error => error.message),
+    third,
+  ]), ['one', 'boom', 'three'])
+  assert.deepEqual(order, ['first', 'second', 'third'])
+  await store.close()
+})
+
+test('Owner file store drains queued operations on close and rejects new ones', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-kernel-'))
+  const store = new OwnerFileStore({ path: join(root, 'close.json'), parse: JSON.parse })
+  const pending = store.enqueue(async () => 'drained')
+  await store.close()
+  assert.equal(await pending, 'drained')
+  await assert.rejects(store.enqueue(async () => 'late'), /closed/)
+  await store.close()
+})
+
+test('Owner file store commits with owner-only modes and legacy bytes', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-kernel-'))
+  const directory = join(root, 'private')
+  const filename = join(directory, 'doc.json')
+  const store = new OwnerFileStore({ path: filename, parse: JSON.parse })
+  await store.commit({ value: 1 })
+  assert.equal(await readFile(filename, 'utf8'), '{\n  "value": 1\n}\n')
+  if (process.platform !== 'win32') {
+    assert.equal(await mode(directory), 0o700)
+    assert.equal(await mode(filename), 0o600)
+  }
+  await store.close()
+})
+
+test('Owner file store cleans up the temp file when the atomic rename fails', async () => {
+  if (process.platform === 'win32') return
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-kernel-'))
+  const filename = join(root, 'occupied')
+  await mkdir(filename)
+  const store = new OwnerFileStore({ path: filename, parse: JSON.parse })
+  await assert.rejects(store.commit({ value: 1 }))
+  assert.deepEqual((await readdir(root)).filter(name => name.includes('.tmp-')), [])
+})
+
+test('Capability envelope degrades unknown errors and never leaks provider details', () => {
+  const envelope = createCapabilityEnvelope({
+    cancelledCodes: ['TEST_ABORTED'],
+    credentialCodes: ['TEST_AUTH_FAILED'],
+  })
+  assert.deepEqual(envelope.success(42), { ok: true, value: 42 })
+  assert.deepEqual(envelope.failure('boom'), {
+    ok: false, error: { code: 'internal', message: 'boom', details: {} },
+  })
+  assert.deepEqual(envelope.failure('boom', 'SOME_CODE', { token: 'secret' }), {
+    ok: false, error: { code: 'internal', message: '[SOME_CODE] boom', details: {} },
+  })
+  assert.deepEqual(envelope.failure('stopped', 'TEST_ABORTED', { token: 'secret' }), {
+    ok: false, error: { code: 'cancelled', message: '[TEST_ABORTED] stopped', details: {} },
+  })
+  assert.deepEqual(envelope.failure('rejected', 'TEST_AUTH_FAILED', { ref: 'TEST_REF', access: 'secret' }), {
+    ok: false, error: { code: 'credential-rejected', message: '[TEST_AUTH_FAILED] rejected', details: { ref: 'TEST_REF' } },
+  })
+  assert.equal(envelope.failure('rejected', 'TEST_AUTH_FAILED', { ref: 42 }).error.code, 'internal')
+  assert.equal(envelope.failure('rejected', 'TEST_AUTH_FAILED').error.code, 'internal')
+})
+
+test('Both capability channels declare their own envelope code sets', () => {
+  assert.deepEqual(chatGptGrokEnvelopeOutcome('PI_AI_AUTH_ABORTED', {}), { code: 'cancelled', details: {} })
+  assert.deepEqual(
+    chatGptGrokEnvelopeOutcome('PI_AI_AUTH_RESOLUTION_FAILED', { ref: 'GROK_BUILD_ACCESS_TOKEN', access: 'secret' }),
+    { code: 'credential-rejected', details: { ref: 'GROK_BUILD_ACCESS_TOKEN' } },
+  )
+  assert.deepEqual(chatGptGrokEnvelopeOutcome('PI_AI_AUTH_LOGIN_FAILED', { token: 'secret' }), { code: 'internal', details: {} })
+  assert.deepEqual(antigravityEnvelopeOutcome('ANTIGRAVITY_LOGIN_ABORTED', {}), { code: 'cancelled', details: {} })
+  assert.deepEqual(
+    antigravityEnvelopeOutcome('ANTIGRAVITY_AUTH_EXPIRED', { ref: 'ANTIGRAVITY_ACCESS_TOKEN', refresh: 'secret' }),
+    { code: 'credential-rejected', details: { ref: 'ANTIGRAVITY_ACCESS_TOKEN' } },
+  )
+  assert.deepEqual(antigravityEnvelopeOutcome('ANTIGRAVITY_AUTH_NOT_CONFIGURED', { not: 'a ref' }), { code: 'internal', details: {} })
+})
+
+test('OAuth credential store keeps its last good snapshot when the file turns invalid', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-oauth-'))
+  const filename = join(root, '.oauth.json')
+  const errors = []
+  const store = new OAuthCredentialFileStore({ filename, onChanged: () => {}, onError: error => errors.push(error) })
+  await store.init()
+  await store.modify('openai-codex', () => ({
+    type: 'oauth', access: 'access-token', refresh: 'refresh-token', expires: 123456789,
+  }))
+  await writeFile(filename, '{"version":1,"credentials":{', 'utf8')
+  await store.reload()
+  assert.equal(errors.length, 1)
+  assert.equal(store.get('openai-codex').access, 'access-token')
+  await unlink(filename)
+  await store.reload()
+  assert.equal(store.has('openai-codex'), false)
+  await store.dispose()
+})
+
+test('Both stores keep their pre-refactor on-disk byte format without temp leftovers', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cap-bytes-'))
+  const oauthFilename = join(root, '.oauth.json')
+  const oauthStore = new OAuthCredentialFileStore({ filename: oauthFilename, onChanged: () => {}, onError: assert.fail })
+  await oauthStore.init()
+  const oauthCredential = {
+    type: 'oauth', access: 'access-token', refresh: 'refresh-token', expires: 123456789,
+    accountId: 'account-id',
+  }
+  await oauthStore.modify('xai', () => oauthCredential)
+  assert.equal(
+    await readFile(oauthFilename, 'utf8'),
+    `${JSON.stringify({ version: 1, credentials: { xai: oauthCredential } }, null, 2)}\n`,
+  )
+  await oauthStore.dispose()
+
+  const authFilename = join(root, '.antigravity-auth.json')
+  const authStore = new AuthStore({ filename: authFilename, onError: assert.fail })
+  await authStore.init()
+  await authStore.upsertAccount('account-a', {
+    type: 'oauth', access: 'access-token', refresh: 'refresh-token', expires: 123456789,
+    email: 'user@example.com', projectId: 'project-a', createdAt: 1,
+  })
+  const account = {
+    type: 'oauth', access: 'access-token', refresh: 'refresh-token', expires: 123456789,
+    projectId: 'project-a', email: 'user@example.com', createdAt: 1,
+  }
+  assert.equal(
+    await readFile(authFilename, 'utf8'),
+    `${JSON.stringify({ version: 2, activeAccountId: 'account-a', autoFailover: false, accounts: { 'account-a': account } }, null, 2)}\n`,
+  )
+  await authStore.setAutoFailover(true)
+  assert.equal(
+    await readFile(authFilename, 'utf8'),
+    `${JSON.stringify({ version: 2, activeAccountId: 'account-a', autoFailover: true, accounts: { 'account-a': account } }, null, 2)}\n`,
+  )
+  assert.deepEqual((await readdir(root)).filter(name => name.includes('.tmp-')), [])
+  await authStore.dispose()
 })
