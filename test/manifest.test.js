@@ -20,6 +20,7 @@ test('package manifest follows the bundle conventions', async () => {
   for (const file of ['bin/install.js', 'cordis.patch.yml', 'lib', 'README.md', 'README.zh.md', 'LICENSE']) {
     assert.ok(manifest.files.includes(file), `files must ship ${file}`)
   }
+  assert.ok(!manifest.files.includes('bench/analytics.mjs'), 'the dev-only bench must not ship with the package')
   assert.ok(manifest.repository.url.includes('shaomingbo/dsh-token-usage'))
 })
 
