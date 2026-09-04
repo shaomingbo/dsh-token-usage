@@ -932,6 +932,135 @@ test('one overlay open issues exactly one account summary RPC', async () => {
   }
 })
 
+test('sidebar entry renders an expired tightest window as unknown with the expired caption', async () => {
+  const base = harnessEntrySummaryPayload()
+  const harness = createHookHarness({
+    responses: new Map([
+      ['/token-usage:entry-summary', {
+        ...base,
+        tightest: { ...base.tightest, usedPct: 70, resetsAt: Date.now() - 60_000, stale: false, ageMs: null, expired: true, brittle: false },
+      }],
+      ['/token-usage:settings', { settings: {} }],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, entryComponent } = harness
+    runtime.render(entryComponent, { wide: true })
+    await flushMicrotasks()
+    const tree = runtime.render(entryComponent, { wide: true })
+    const json = JSON.stringify(tree)
+    assert.ok(json.includes('Window reset — waiting for a new observation'), 'expired caption present')
+    assert.ok(json.includes('"—"'), 'expired percent reads as unknown, never 0%')
+    assert.ok(!json.includes('70%'), 'the stale percentage must not show')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('sidebar entry labels a stale official observation with its relative age', async () => {
+  const base = harnessEntrySummaryPayload()
+  const harness = createHookHarness({
+    responses: new Map([
+      ['/token-usage:entry-summary', {
+        ...base,
+        tightest: { ...base.tightest, usedPct: 70, stale: true, ageMs: 32 * 60_000, expired: false },
+      }],
+      ['/token-usage:settings', { settings: {} }],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, entryComponent } = harness
+    runtime.render(entryComponent, { wide: true })
+    await flushMicrotasks()
+    const tree = runtime.render(entryComponent, { wide: true })
+    const json = JSON.stringify(tree)
+    assert.ok(json.includes('32m ago'), 'relative age is visible next to the percent')
+    assert.ok(json.includes('Official data is stale'), 'stale warning carried in title/aria')
+    assert.ok(json.includes('70%'), 'a merely stale observation keeps its value')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('account insight marks brittle official sources by flag, not by source kind', async () => {
+  const account = {
+    ...harnessPool('connection:glm:default', 'GLM Coding Plan'),
+    official: {
+      observedAt: Date.now() - 60_000,
+      sourceKind: 'official_plugin_internal_api',
+      brittle: true,
+      windows: [{ id: 'w1', label: '5h', percentUsed: 66, resetsAt: Date.now() + 3_600_000, observedAt: Date.now() - 60_000, ageMs: 60_000, stale: false, expired: false }],
+    },
+  }
+  const harness = createHookHarness({
+    responses: new Map([
+      ['/token-usage:query', harnessQueryPayload()],
+      ['/account-usage:summary', harnessSummaryPayload()],
+      ['/token-usage:inspect', { ...harnessInspectPayload('GLM Coding Plan'), account }],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, overlayComponent, store } = harness
+    store.update({ open: true, mode: 'dash', account: 'connection:glm:default' })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    // Second render mounts AccountInsight (the dashboard box is ready); the
+    // third shows its settled inspect payload.
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    const tree = runtime.render(overlayComponent, {})
+    const json = JSON.stringify(tree)
+    assert.ok(json.includes('Brittle source'), 'brittle hint renders even though the kind is not official_ui')
+    assert.ok(json.includes('official client API'), 'sourceLabel still maps the source kind itself')
+    assert.ok(!json.includes('official page'), 'no official_ui label is implied by the brittle flag')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('cost hero marks the unknown-price floor and ranking shares use the host full-set total', async () => {
+  const payload = harnessQueryPayload()
+  payload.partial = { purgedDays: false, unknownPrices: true, sourceDeleted: false, estimatesIncluded: false }
+  payload.rankings = {
+    dimension: 'model', by: 'currentUsdNano', total: 1000,
+    rows: [{
+      key: 'm1', label: 'Big Model', requests: 0, newComputeTokens: 0,
+      cost: { ...harnessMeasures().cost, currentUsdNano: 420 },
+      share: 0.42, poolId: 'connection:openai-codex:default',
+    }],
+  }
+  const harness = createHookHarness({
+    responses: new Map([
+      ['/token-usage:query', payload],
+      ['/account-usage:summary', harnessSummaryPayload()],
+    ]),
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, overlayComponent, store } = harness
+    store.update({ open: true, mode: 'dash', account: null })
+    runtime.render(overlayComponent, {})
+    await flushMicrotasks()
+    const tree = runtime.render(overlayComponent, {})
+    const json = JSON.stringify(tree)
+    assert.ok(json.includes('≥'), 'floor marker sits next to the amount')
+    assert.ok(json.includes('Partly unpriced'), 'unpriced badge present')
+    assert.ok(json.includes('Some models have no price; the cost is a lower bound'), 'floor disclosure in the title')
+    // The one page row holds 420 of a 1000 full-set total: a locally
+    // re-derived denominator would print 100%, the host share prints 42%.
+    assert.ok(json.includes('42%'), 'share comes from the returned full-set share')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
 test('locale dictionaries have no duplicate keys and identical en/zh key sets', () => {
   // Duplicate object-literal keys silently overwrite (the old newCompute
   // bug), so this inspects the dictionary source instead of the built

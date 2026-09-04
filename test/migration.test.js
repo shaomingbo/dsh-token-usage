@@ -71,6 +71,47 @@ test('re-running migrations on an existing file creates a pre-migration backup',
   }
 })
 
+test('v10 backfills observation usability and indexes latest-per-connection reads', () => {
+  const env = tempDir()
+  try {
+    const dbPath = join(env.dir, 'usage.sqlite')
+    const legacy = openDatabase(dbPath)
+    legacy.prepare(`INSERT INTO account_connections
+      (id, provider_id, status, auth_kind, created_at, updated_at)
+      VALUES ('conn', 'ollama-cloud', 'connected', 'external', 1, 1)`).run()
+    const insert = legacy.prepare(`INSERT INTO account_observations
+      (id, connection_id, observed_at, source_kind, brittle, payload_json)
+      VALUES (?, 'conn', ?, 'official_ui', 0, ?)`)
+    insert.run('scrape', 3, JSON.stringify({ observedAt: 3, windows: [{ id: 'w' }], limits: [{ id: 'l', windowId: 'w', percentUsed: 32.7 }] }))
+    insert.run('string-percent', 4, JSON.stringify({ observedAt: 4, limits: [{ id: 'l', percentUsed: null }] }))
+    insert.run('probe', 5, JSON.stringify({ observedAt: 5, windows: [], limits: [] }))
+    insert.run('no-limits-key', 6, JSON.stringify({ observedAt: 6, windows: [] }))
+    legacy.exec(`
+      DROP INDEX account_observations_usable_latest;
+      ALTER TABLE account_observations DROP COLUMN usable;
+      UPDATE meta SET value = '9' WHERE key = 'schema_version';
+    `)
+    legacy.close()
+
+    const migrated = openDatabase(dbPath)
+    const rows = migrated.prepare('SELECT id, usable FROM account_observations ORDER BY id').all().map((row) => ({ ...row }))
+    assert.deepEqual(rows, [
+      { id: 'no-limits-key', usable: 0 },
+      { id: 'probe', usable: 0 },
+      { id: 'scrape', usable: 1 },
+      { id: 'string-percent', usable: 1 },
+    ], 'payloads with at least one limit are usable; window-less probes are not')
+    const indexes = migrated.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'account_observations'").all().map((row) => row.name)
+    assert.ok(indexes.includes('account_observations_usable_latest'), 'expected the usable-latest index')
+    assert.ok(indexes.includes('account_observations_connection_time'))
+    assert.equal(Number(migrated.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get().value), SCHEMA_VERSION)
+    migrated.close()
+    assert.ok(existsSync(`${dbPath}.pre-migration`), 'expected a pre-migration backup copy')
+  } finally {
+    env.cleanup()
+  }
+})
+
 test('v9 preserves legacy cache facts while restoring reported-versus-unknown presence', () => {
   const env = tempDir()
   try {
