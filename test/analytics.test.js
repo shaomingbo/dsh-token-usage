@@ -832,7 +832,7 @@ test('a later empty official_response does not hide an earlier official_ui obser
       ['Session usage', 0],
       ['Weekly', 32.7],
     ])
-    const detail = service.inspect({ kind: 'pool', id: account.id, filter: { timezone: 'UTC' } })
+    const detail = service.inspect({ kind: 'pool', id: account.id, filter: { timezone: 'UTC' }, now })
     assert.equal(detail.account.official.windows.length, 2)
     assert.equal(detail.account.official.windows[0].percentUsed, 0)
   } finally {
@@ -1078,7 +1078,7 @@ test('saveAccount creates template accounts with limits, rules and official-wind
     assert.equal(entryPool.window.sourceKind, 'official_plugin_internal_api')
 
     // inspect carries the account identity, declared limits, rules and trend.
-    const detail = service.inspect({ kind: 'pool', id: created.id, filter: { timezone: 'UTC' } })
+    const detail = service.inspect({ kind: 'pool', id: created.id, filter: { timezone: 'UTC' }, now })
     assert.equal(detail.identity.name, 'GLM Coding Plan Pro')
     assert.equal(detail.identity.rules.length, 1)
     assert.equal(detail.identity.declaredLimits.length, 2)

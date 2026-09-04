@@ -65,7 +65,7 @@
       ],
       "limits": [
         { "externalKey": "primary", "unit": "credits", "valueMode": "exact", "windowKind": "rolling", "windowSeconds": 18000 },
-        { "externalKey": "weekly", "unit": "credits", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 604800 }
+        { "externalKey": "weekly", "unit": "credits", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 604800, "anchor": { "weekday": 1, "hour": 0, "timezone": "Asia/Shanghai" } }
       ],
       "notes": "Officially published plan credits (research snapshot 2026-09). Credits are plan units, not ledger tokens: percentages come from the official observation, never from local token math."
     },
@@ -147,7 +147,7 @@
         { "id": "enterprise", "name": "Enterprise", "priceUsd": null, "limitValues": { "daily": 2000 } }
       ],
       "limits": [
-        { "externalKey": "daily", "unit": "requests", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 86400 }
+        { "externalKey": "daily", "unit": "requests", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 86400, "anchor": { "hour": 0 } }
       ],
       "notes": "Model requests per user per day; one user prompt may emit several model requests. Agent mode and Gemini CLI share the daily pool."
     },
@@ -196,7 +196,7 @@
       ],
       "limits": [
         { "externalKey": "5h", "unit": "requests", "valueMode": "exact", "windowKind": "rolling", "windowSeconds": 18000 },
-        { "externalKey": "weekly", "unit": "requests", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 604800 },
+        { "externalKey": "weekly", "unit": "requests", "valueMode": "exact", "windowKind": "fixed", "windowSeconds": 604800, "anchor": { "weekday": 1, "hour": 0, "timezone": "Asia/Shanghai" } },
         { "externalKey": "monthly", "unit": "requests", "valueMode": "exact", "windowKind": "billing", "windowSeconds": null }
       ],
       "notes": "Three simultaneous AND caps in model requests; hitting any one stops usage. Weekly resets Monday 00:00 UTC+8."

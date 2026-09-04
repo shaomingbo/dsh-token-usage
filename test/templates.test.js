@@ -28,6 +28,13 @@ test('bundled catalog validates and carries the researched market structure', ()
   const aliyun = catalog.templates.find((template) => template.id === 'aliyun-bailian-coding-plan')
   assert.equal(aliyun.limits.length, 3)
   assert.ok(aliyun.limits.every((limit) => limit.unit === 'requests' && limit.valueMode === 'exact'))
+  // Fixed windows declare their calendar reset anchors.
+  assert.deepEqual(aliyun.limits.find((limit) => limit.externalKey === 'weekly').anchor,
+    { weekday: 1, hour: 0, timezone: 'Asia/Shanghai' })
+  const glmWeekly = glm.limits.find((limit) => limit.externalKey === 'weekly')
+  assert.deepEqual(glmWeekly.anchor, { weekday: 1, hour: 0, timezone: 'Asia/Shanghai' })
+  const gemini = catalog.templates.find((template) => template.id === 'gemini-code-assist')
+  assert.deepEqual(gemini.limits.find((limit) => limit.externalKey === 'daily').anchor, { hour: 0 })
   assert.equal(catalog.templates.some((template) => template.kind === 'prepaid'), true)
   assert.equal(catalog.templates.some((template) => template.kind === 'track_only'), true)
 })
@@ -47,6 +54,15 @@ test('catalog validation rejects duplicates, bad enums and orphan tier values', 
   const badUnit = structuredClone(base)
   badUnit.templates[0].limits[0].unit = 'messages'
   assert.throws(() => validateTemplateCatalog(badUnit), /unit/)
+  const badWeekday = structuredClone(base)
+  badWeekday.templates[3].limits[1].anchor = { weekday: 9 }
+  assert.throws(() => validateTemplateCatalog(badWeekday), /anchor\.weekday/)
+  const badZone = structuredClone(base)
+  badZone.templates[3].limits[1].anchor = { weekday: 1, timezone: 'Mars/Olympus' }
+  assert.throws(() => validateTemplateCatalog(badZone), /anchor\.timezone/)
+  const badAnchorShape = structuredClone(base)
+  badAnchorShape.templates[3].limits[1].anchor = 'monday'
+  assert.throws(() => validateTemplateCatalog(badAnchorShape), /anchor must be an object/)
   const orphanTier = structuredClone(base)
   orphanTier.templates[0].tiers[0].limitValues = { nonexistent: 10 }
   assert.throws(() => validateTemplateCatalog(orphanTier), /no limit declares/)
@@ -87,6 +103,9 @@ test('seeding is idempotent, alias-complete and never overwrites non-bundled row
     assert.equal(glm.name, 'GLM Coding Plan')
     assert.ok(glm.aliases.includes('zai-coding-cn'))
     assert.equal(glm.product.kind, 'subscription')
+    // Anchors survive the seeding round-trip for the wizard RPC surface.
+    assert.deepEqual(glm.limits.find((limit) => limit.externalKey === 'weekly').anchor,
+      { weekday: 1, hour: 0, timezone: 'Asia/Shanghai' })
   } finally {
     db.close()
   }
