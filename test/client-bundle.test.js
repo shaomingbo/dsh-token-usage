@@ -931,3 +931,69 @@ test('one overlay open issues exactly one account summary RPC', async () => {
     restore()
   }
 })
+
+test('locale dictionaries have no duplicate keys and identical en/zh key sets', () => {
+  // Duplicate object-literal keys silently overwrite (the old newCompute
+  // bug), so this inspects the dictionary source instead of the built
+  // objects: a line-start key or a `, key:` continuation both count.
+  const dictKeys = (name) => {
+    const start = source.indexOf(`const ${name} = {`)
+    assert.ok(start >= 0, `missing ${name} dictionary`)
+    const open = source.indexOf('{', start)
+    const end = source.indexOf('\n    }', open)
+    assert.ok(end > open, `unterminated ${name} dictionary`)
+    return [...source.slice(open + 1, end).matchAll(/(?:^|,)\s*([A-Za-z_$][\w$]*)\s*:/gm)].map((match) => match[1])
+  }
+  const enKeys = dictKeys('en')
+  const zhKeys = dictKeys('zh')
+  assert.ok(enKeys.length > 100 && zhKeys.length > 100, 'dictionaries must still carry their keys')
+  const duplicates = (keys) => [...new Set(keys.filter((key, index) => keys.indexOf(key) !== index))]
+  assert.deepEqual(duplicates(enKeys), [], 'en dictionary has duplicate keys')
+  assert.deepEqual(duplicates(zhKeys), [], 'zh dictionary has duplicate keys')
+  assert.deepEqual([...new Set(enKeys)].sort(), [...new Set(zhKeys)].sort(), 'en and zh key sets must be identical')
+})
+
+test('localJson: read/write/remove with fallbacks for missing, corrupt and legacy values', () => {
+  const { bundle, require } = loadClientHarness()
+  const module = bundle.factory(require)
+  assert.equal(typeof module.localJson, 'function', 'localJson is exposed for the storage tests')
+  const backing = new Map()
+  const previous = globalThis.localStorage
+  globalThis.localStorage = {
+    getItem: (key) => (backing.has(key) ? backing.get(key) : null),
+    setItem: (key, value) => { backing.set(key, String(value)) },
+    removeItem: (key) => { backing.delete(key) },
+  }
+  try {
+    const store = module.localJson('test.key', () => ({ fallback: true }))
+    // A missing key falls back, with a fresh object per read.
+    assert.deepEqual(store.read(), { fallback: true })
+    assert.notEqual(store.read(), store.read())
+    // write() JSON-encodes; the value round-trips through read().
+    store.write({ marked: 'x' })
+    assert.equal(backing.get('test.key'), JSON.stringify({ marked: 'x' }))
+    assert.deepEqual(store.read(), { marked: 'x' })
+    // JSON-shaped but unparseable content falls back instead of throwing.
+    backing.set('test.key', '{"broken"')
+    assert.deepEqual(store.read(), { fallback: true })
+    // A value that was never JSON (legacy plain string) reads back raw.
+    backing.set('test.key', 'connection:provider:default')
+    assert.equal(store.read(), 'connection:provider:default')
+    // remove() drops the key so read() falls back again.
+    store.write('value')
+    store.remove()
+    assert.equal(backing.has('test.key'), false)
+    assert.deepEqual(store.read(), { fallback: true })
+    // Storage failures are swallowed on write, remove and read.
+    globalThis.localStorage = {
+      getItem: () => { throw new Error('unavailable') },
+      setItem: () => { throw new Error('full') },
+      removeItem: () => { throw new Error('gone') },
+    }
+    assert.doesNotThrow(() => store.write('x'))
+    assert.doesNotThrow(() => store.remove())
+    assert.deepEqual(store.read(), { fallback: true })
+  } finally {
+    globalThis.localStorage = previous
+  }
+})
