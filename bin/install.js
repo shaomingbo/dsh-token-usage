@@ -14,7 +14,8 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const PACKAGE_NAME = 'dsh-token-usage'
-export const SUPPORTED_DSH_VERSION = '0.1.2-rc.1'
+export const SUPPORTED_DSH_VERSIONS = Object.freeze(['0.1.2-rc.1', '0.1.2-alpha.3'])
+export const SUPPORTED_DSH_VERSION = SUPPORTED_DSH_VERSIONS[0]
 // Default source derives from this package's own version so the pinned tag can
 // never drift behind a release again (v5.0.23 shipped pinned to v5.0.22).
 const PACKAGE_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -129,7 +130,7 @@ function checkCli(env) {
   if (!success(version)) throw new Error(`Cannot determine dsh CLI version. ${CLI_GUIDANCE}`)
   // --version is the version contract; never infer command success from prose.
   const actual = version.stdout.trim()
-  if (actual !== SUPPORTED_DSH_VERSION) throw new Error(`Unsupported dsh CLI version ${JSON.stringify(actual)}; require exactly ${SUPPORTED_DSH_VERSION}. ${CLI_GUIDANCE}`)
+  if (!SUPPORTED_DSH_VERSIONS.includes(actual)) throw new Error(`Unsupported dsh CLI version ${JSON.stringify(actual)}; require one of ${SUPPORTED_DSH_VERSIONS.join(', ')}. ${CLI_GUIDANCE}`)
   // Do NOT probe `dsh plugin ... --help`: in published rc.1 help is forwarded
   // to pnpm AFTER profile initialization. Only launcher help is read-only.
   if (!success(invoke(['--help'], env))) throw new Error(`dsh ${SUPPORTED_DSH_VERSION} lacks the required read-only launcher help capability. ${CLI_GUIDANCE}`)

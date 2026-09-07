@@ -5,19 +5,19 @@
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.1
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.0` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires exactly `dsh` `0.1.2-rc.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.1` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 

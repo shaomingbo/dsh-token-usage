@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -201,11 +201,35 @@ test('data dir resolves inside the profile when installed conventionally', () =>
   }
 })
 
-test('data dir falls back to the home level for linked development sources', () => {
+test('data dir follows the profile even when the plugin is a symlink to a checkout', () => {
   const env = tempHome()
   try {
-    const dir = resolveDataDir({ moduleUrl: import.meta.url, home: env.home })
-    assert.equal(dir, join(env.home, 'dsh-token-usage'))
+    const checkout = join(env.home, 'checkout', 'dsh-token-usage')
+    const linkedRoot = join(env.home, 'profiles', 'web', 'node_modules', 'dsh-token-usage')
+    mkdirSync(join(checkout, 'lib'), { recursive: true })
+    mkdirSync(join(env.home, 'profiles', 'web', 'node_modules'), { recursive: true })
+    writeFileSync(join(checkout, 'lib', 'index.js'), '// marker\n')
+    symlinkSync(checkout, linkedRoot)
+    const dir = resolveDataDir({
+      moduleUrl: pathToFileURL(join(linkedRoot, 'lib', 'index.js')),
+      home: env.home,
+    })
+    assert.equal(dir, join(env.home, 'profiles', 'web', 'data', 'dsh-token-usage'))
+  } finally {
+    env.cleanup()
+  }
+})
+
+test('data dir uses the profile that bundles the plugin, never the home-level fallback', () => {
+  const env = tempHome()
+  try {
+    mkdirSync(join(env.home, 'profiles', 'web'), { recursive: true })
+    writeFileSync(join(env.home, 'profiles', 'web', 'package.json'), JSON.stringify({
+      dependencies: { 'dsh-token-usage': 'link:../..' },
+      dsh: { profile: { bundles: ['dsh-token-usage'] } },
+    }))
+    const dir = resolveDataDir({ moduleUrl: import.meta.url, home: env.home, cwd: env.home })
+    assert.equal(dir, join(env.home, 'profiles', 'web', 'data', 'dsh-token-usage'))
   } finally {
     env.cleanup()
   }

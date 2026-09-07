@@ -370,6 +370,44 @@ test('summary answers the Ollama key question once through connection collection
   }
 })
 
+test('background rounds do not scrape Ollama settings without persisted auto-observe consent', async () => {
+  const env = tempHome()
+  process.env.DSH_HOME = env.home
+  const hits = { tags: 0, settings: 0 }
+  const fetchImpl = async (url) => {
+    const target = String(url)
+    if (target.startsWith('https://ollama.com/settings')) {
+      hits.settings += 1
+      return { ok: true, status: 200, url: target, text: async () => '<main><h2>Cloud Usage</h2><span>Weekly usage</span><span>1% used</span></main>' }
+    }
+    if (target.startsWith('https://ollama.com')) {
+      hits.tags += 1
+      return OK_JSON({ models: [] })
+    }
+    throw new Error(`unexpected fetch ${target}`)
+  }
+  const { ctx, channels, eventListeners } = fakeCtx({
+    credentialValues: {
+      OLLAMA_API_KEY: 'test-secret',
+      OLLAMA_SESSION_COOKIE: 'better-auth.session_token=session-secret',
+    },
+  })
+  try {
+    apply(ctx, { providerProxy: false, fetchImpl, observationRoundTimeoutMs: 5000 })
+    const accountChannel = channels.get('/account-usage')
+    await waitFor(() => hits.tags >= 1)
+    await accountChannel.handler('summary', {})
+    await settle(400)
+    assert.equal(hits.settings, 0, 'silent refresh must not scrape settings without consent')
+
+    const manual = await accountChannel.handler('refresh-observations', { refresh: true })
+    assert.equal(manual.ok, true)
+    assert.ok(hits.settings >= 1, 'manual refresh may scrape with a stored cookie')
+  } finally {
+    await disposeAndClean(eventListeners, env)
+  }
+})
+
 /** Poll the accounts endpoint until the boot pass has created its auto account. */
 async function accountReady(channels) {
   const accountChannel = channels.get('/account-usage')

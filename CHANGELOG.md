@@ -1,5 +1,14 @@
 # Changelog
 
+## 5.1.1
+
+Observation freshness: per-connection quota capabilities, overlay-scoped
+Ollama settings scraping, profile data-dir identity without silent empty
+stores, short sidebar poll while a refresh is running, 429/auth backoff,
+and `link:` checkout dependency install. Default source is
+`github:shaomingbo/dsh-token-usage#v5.1.1`. Codex runtime from 5.1.0 is
+unchanged.
+
 ## 5.1.0
 
 Stable release. Content equals the reviewed `5.1.0-rc.2` candidate: the

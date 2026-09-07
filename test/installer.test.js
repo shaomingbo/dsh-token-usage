@@ -194,7 +194,7 @@ test('wrong, unknown or failed version never mutates existing manifest', (t) => 
   const f = fixture(t)
   f.seed({ marker: 'retain' })
   const before = f.raw()
-  for (const version of ['0.1.2-alpha.3', '0.1.2-rc.2', '0.1.2', 'unknown', 'dsh 0.1.2-rc.1']) fails(f.run([], { FAKE_VERSION: version }), /Unsupported dsh CLI version/)
+  for (const version of ['0.1.2-rc.2', '0.1.2', 'unknown', 'dsh 0.1.2-rc.1']) fails(f.run([], { FAKE_VERSION: version }), /Unsupported dsh CLI version/)
   fails(f.run([], { FAKE_MODE: 'version-fail' }), /Cannot determine/)
   assert.equal(f.raw(), before)
   assert.deepEqual(mutations(f), [])
