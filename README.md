@@ -1,23 +1,23 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches. The `5.1.0-rc.2` release candidate adds the owner-bound `codex-runtime/v1` capability (see below); it is not a published artifact until its tag is actually pushed and verified.
+`dsh-token-usage` 5.x keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches. The `5.1.0` stable release adds the owner-bound `codex-runtime/v1` capability (see below); the fixed tag is assumed only after the maintainer has actually pushed and verified it, and the historical RC tags (`5.1.0-rc.1`, `5.1.0-rc.2`) are retained.
 
 ## Install
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0
 ```
 
-This installs into the `web` profile. **The fixed tag is a release candidate; publication is not assumed.** Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
+This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0-rc.2
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.0-rc.2` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires exactly `dsh` `0.1.2-rc.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.0` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires exactly `dsh` `0.1.2-rc.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 
@@ -25,7 +25,7 @@ npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 --help
 node bin/install.js --source link:$PWD
 ```
 
-Only the fixed candidate source or an explicit `link:<local-path>` is accepted; floating sources are rejected.
+Only the fixed release source or an explicit `link:<local-path>` is accepted; floating sources are rejected.
 
 ## Account lifecycle (v5)
 
@@ -77,19 +77,20 @@ npm pack --dry-run --ignore-scripts
 
 `npm run bench:v2` is a development-only analytics benchmark and is not published with the package.
 
-Tests use synthetic data and temporary `DSH_HOME` directories. This release candidate was verified against stock DSH `0.1.2-rc.1` on Node 24.18.0/macOS arm64; lower Node versions were not rerun for the new native capability; the installer refuses other `dsh` CLI versions. Earlier-version compatibility conclusions from previous releases do not carry over to this package, and no broader compatibility is claimed.
+Tests use synthetic data and temporary `DSH_HOME` directories. This release was verified against stock DSH `0.1.2-rc.1` on Node 24.18.0/macOS arm64; lower Node versions were not rerun for the new native capability; the installer refuses other `dsh` CLI versions. Earlier-version compatibility conclusions from previous releases do not carry over to this package, and no broader compatibility is claimed.
 
-## Codex native capability (5.1.0-rc.2 release candidate)
+## Codex native capability (5.1.0 stable)
 
 This version ships the owner-bound `codex-runtime/v1` capability for the paired
-`dsh-codex-compaction` 0.3.0-rc.1 candidate: native compaction/replay through the
+`dsh-codex-compaction` 0.3.0 stable release: native compaction/replay through the
 existing ChatGPT connection, with OAuth values kept inside the account owner and
 no second login or credential store. Custom models (e.g. `gpt-6-astra`) resolve
 only through the trusted model-facts seam reading public host-configured profile
 fields; missing or conflicting metadata reports fixed-vocabulary gaps instead of
-invented values. **Both RC candidates are prereleases, not stable releases** — the
-published 5.0.24 artifact must not be assumed to contain this interface, and the
-release tags are assumed only after they are actually pushed and verified.
+invented values. The published 5.0.24 artifact must not be assumed to contain
+this interface, and the fixed tags are assumed only after the maintainer has
+actually pushed and verified them; the historical RC tags (`5.1.0-rc.1`,
+`5.1.0-rc.2`) are retained.
 
 If this checkout's `node_modules` points at a live DSH profile, do not install
 dependencies there. Validate the paired checkout with the compaction project's

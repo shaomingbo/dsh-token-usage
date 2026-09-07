@@ -1,5 +1,17 @@
 # Changelog
 
+## 5.1.0
+
+Stable release. Content equals the reviewed `5.1.0-rc.2` candidate: the
+owner-bound `codex-runtime/v1` capability, the pinned SDKs and the public-CLI
+installer are unchanged, and no production logic changed relative to
+`5.1.0-rc.2`. The installer's default source stays version-derived
+(`github:shaomingbo/dsh-token-usage#v5.1.0`). The fixed tag is assumed only
+after the maintainer has actually pushed and verified it; the RC tags
+(`5.1.0-rc.1`, `5.1.0-rc.2`) are retained as history. Pairs with
+`dsh-codex-compaction` `0.3.0` stable; see that package's `docs/VALIDATION.md`
+for the de-identified validation facts of this release train.
+
 ## 5.1.0-rc.2 (release candidate)
 
 - Treat a schema-materialized empty model `input` array as unspecified, matching the public PiAiModelProfile contract; inherit host/catalog modalities instead of rejecting Sol with MODEL_METADATA.
