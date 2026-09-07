@@ -1,170 +1,291 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { run, runPnpmInstall, parseArgs, applyManifest, removeManifest, describeStatus, PACKAGE_NAME } from '../bin/install.js'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { DEFAULT_SOURCE, PACKAGE_NAME, SUPPORTED_DSH_VERSION, parseArgs } from '../bin/install.js'
 
-function tempHome() {
-  const home = mkdtempSync(join(tmpdir(), 'dsh-token-usage-home-'))
-  return { home, cleanup: () => rmSync(home, { recursive: true, force: true }) }
+const installer = fileURLToPath(new URL('../bin/install.js', import.meta.url))
+// This fake is an executable on a temp PATH, not an injected successful result.
+// It models the documented rc.1 argv/manifest contract, NOT a real pnpm smoke.
+const fake = `#!${process.execPath}
+const fs = require('node:fs');
+const path = require('node:path');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.FAKE_LOG, JSON.stringify(args) + '\\n');
+const mode = process.env.FAKE_MODE;
+if (args.length === 1 && args[0] === '--version') {
+  console.log(process.env.FAKE_VERSION || '${SUPPORTED_DSH_VERSION}');
+  process.exit(mode === 'version-fail' ? 9 : 0);
 }
-
-function writeProfile(home, profile = 'web', manifest = {}) {
-  const profileDir = join(home, 'profiles', profile)
-  mkdirSync(profileDir, { recursive: true })
-  writeFileSync(join(profileDir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
-  return profileDir
+if (args.length === 1 && args[0] === '--help') {
+  if (mode === 'no-help') process.exit(7);
+  console.log('Arbitrary localized launcher help; no success parsing allowed');
+  process.exit(0);
 }
-
-function readProfile(profileDir) {
-  return JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8'))
+if (args[0] === 'plugin' && args.includes('--help')) {
+  // Real rc.1 forwards --help to pnpm after initializing a profile.
+  const target = path.join(process.env.DSH_HOME, 'profiles', args[2], 'package.json');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify({ name: 'unexpected-help-side-effect' }));
+  process.exit(0);
 }
+if (args.length !== 6 || args[0] !== 'plugin' || args[1] !== '--profile'
+  || !['add', 'remove'].includes(args[3]) || args[5] !== (args[3] === 'add' ? '--ignore-scripts' : '--config.ignore-scripts=true')
+  || process.env.npm_config_ignore_scripts !== 'true') process.exit(92);
+const target = path.join(process.env.DSH_HOME, 'profiles', args[2], 'package.json');
+const original = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : null;
+if (mode === 'fail-clean') { console.log('Successfully installed!'); process.exit(8); }
+if (mode === 'lie') { console.log('Success!'); process.exit(0); }
+fs.mkdirSync(path.dirname(target), { recursive: true });
+const manifest = original === null ? { name: 'profile', dsh: { profile: { bundles: ['base'] } } } : JSON.parse(original);
+if (mode !== 'fail-init') {
+  manifest.dependencies ??= {};
+  manifest.dsh ??= {};
+  manifest.dsh.profile ??= {};
+  manifest.dsh.profile.bundles ??= [];
+  const name = '${PACKAGE_NAME}';
+  if (args[3] === 'add') {
+    manifest.dependencies[name] = mode === 'wrong-source' ? 'github:other/repo#main' : args[4];
+    if (mode !== 'no-bundle' && !manifest.dsh.profile.bundles.includes(name)) manifest.dsh.profile.bundles.push(name);
+    if (mode === 'duplicate') manifest.dsh.profile.bundles.push(name);
+  } else {
+    if (args[4] !== name) process.exit(93);
+    delete manifest.dependencies[name];
+    manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(x => x !== name);
+  }
+}
+fs.writeFileSync(target, JSON.stringify(manifest, null, 2) + '\\n');
+if (mode === 'fail-dirty' || mode === 'fail-init') process.exit(8);
+console.log('arbitrary output (not parsed)');
+`
 
-const failingInstall = async () => { throw new Error('pnpm exploded') }
-const okInstall = async () => {}
+function fixture(t) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'dsh-token-usage-installer-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const bin = join(root, 'bin')
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'dsh'), fake)
+  chmodSync(join(bin, 'dsh'), 0o755)
+  const home = join(root, 'home')
+  const log = join(root, 'cli.log')
+  const env = { PATH: bin, DSH_HOME: home, HOME: root, FAKE_LOG: log }
+  const manifestPath = (profile = 'web') => join(home, 'profiles', profile, 'package.json')
+  const raw = (profile) => existsSync(manifestPath(profile)) ? readFileSync(manifestPath(profile), 'utf8') : null
+  const seed = (manifest, profile = 'web') => {
+    mkdirSync(dirname(manifestPath(profile)), { recursive: true })
+    writeFileSync(manifestPath(profile), typeof manifest === 'string' ? manifest : JSON.stringify(manifest))
+  }
+  const calls = () => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map(JSON.parse) : []
+  const run = (args = [], extraEnv = {}) => spawnSync(process.execPath, [installer, ...args], { cwd: root, env: { ...env, ...extraEnv }, encoding: 'utf8' })
+  return { root, bin, home, env, run, raw, seed, calls, manifestPath }
+}
+const mutations = (f) => f.calls().filter((args) => args[0] === 'plugin' && !args.includes('--help'))
+function ok(result) { assert.equal(result.status, 0, result.stderr) }
+function fails(result, pattern) { assert.equal(result.status, 1, result.stdout); assert.match(result.stderr, pattern) }
 
-test('parseArgs defaults to install on the web profile with the pinned source', () => {
+test('parseArgs defaults to install on the web profile with the version-derived pinned source', () => {
   const options = parseArgs([])
   assert.equal(options.command, 'install')
   assert.equal(options.profile, 'web')
+  assert.equal(options.source, DEFAULT_SOURCE)
   const packageVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
-  assert.equal(options.source, `github:shaomingbo/${PACKAGE_NAME}#v${packageVersion}`)
-  assert.throws(() => parseArgs(['--profile']), /require values/)
-  assert.throws(() => parseArgs(['bogus']), /unknown argument/)
-  assert.equal(parseArgs(['uninstall']).command, 'uninstall')
-  assert.equal(parseArgs(['--help']).help, true)
+  assert.equal(DEFAULT_SOURCE, `github:shaomingbo/dsh-token-usage#v${packageVersion}`)
+  assert.match(DEFAULT_SOURCE, /#v5\.1\.0-rc\.1$/)
 })
 
-test('environment source override is honored without changing the pinned default', () => {
+test('environment source override is honored and normalized like --source', () => {
   const previous = process.env.DSH_TOKEN_USAGE_SOURCE
-  process.env.DSH_TOKEN_USAGE_SOURCE = 'link:/tmp/accounts-usage'
-  try { assert.equal(parseArgs([]).source, 'link:/tmp/accounts-usage') }
-  finally {
+  process.env.DSH_TOKEN_USAGE_SOURCE = 'link:./local-account'
+  try {
+    const options = parseArgs([])
+    assert.equal(options.source, `link:${join(process.cwd(), 'local-account')}`)
+  } finally {
     if (previous === undefined) delete process.env.DSH_TOKEN_USAGE_SOURCE
     else process.env.DSH_TOKEN_USAGE_SOURCE = previous
   }
 })
 
-test('dependency installation falls back from pnpm to corepack and reports dual failure', () => {
-  const calls = []
-  runPnpmInstall('/tmp/profile', { spawn(command, args) {
-    calls.push([command, args])
-    return command === 'pnpm' ? { error: { code: 'ENOENT' } } : { status: 0 }
-  } })
-  assert.deepEqual(calls.map(([command]) => command), ['pnpm', 'corepack'])
-  assert.deepEqual(calls[1][1], ['pnpm', 'install', '--ignore-scripts'])
-  assert.throws(() => runPnpmInstall('/tmp/profile', { spawn() { return { error: { code: 'ENOENT' } } } }), /pnpm is unavailable/)
+test('first/repeat install and uninstall use exact public argv and preserve unrelated fields', (t) => {
+  const f = fixture(t)
+  const seed = { name: 'custom', dependencies: { other: '1.2.3' }, scripts: { custom: 'untouched' }, dsh: { custom: 1, profile: { patchReload: 'live', bundles: ['base', 'other'] } } }
+  f.seed(seed)
+  ok(f.run())
+  const installed = f.raw()
+  const value = JSON.parse(installed)
+  assert.equal(value.dependencies[PACKAGE_NAME], DEFAULT_SOURCE)
+  assert.deepEqual(value.dsh.profile.bundles, ['base', 'other', PACKAGE_NAME])
+  assert.deepEqual(value.scripts, seed.scripts)
+  assert.equal(value.dsh.profile.patchReload, 'live')
+  ok(f.run(['install']))
+  assert.equal(f.raw(), installed)
+  ok(f.run(['uninstall']))
+  assert.deepEqual(JSON.parse(f.raw()), seed)
+  const removed = f.raw()
+  ok(f.run(['uninstall']))
+  assert.equal(f.raw(), removed)
+  assert.deepEqual(mutations(f), [
+    ['plugin', '--profile', 'web', 'add', DEFAULT_SOURCE, '--ignore-scripts'],
+    ['plugin', '--profile', 'web', 'remove', PACKAGE_NAME, '--config.ignore-scripts=true'],
+  ])
 })
 
-test('applyManifest/removeManifest/describeStatus edit only the two allowed slots', () => {
-  const manifest = {
-    name: 'profile',
-    dependencies: { '@deepseek-ai/dsh-web-app': 'catalog:' },
-    dsh: { profile: { bundles: ['@deepseek-ai/dsh-web-app'] }, other: { keep: true } },
-  }
-  const applied = applyManifest(manifest, 'link:/tmp/x')
-  assert.equal(applied.dependencies[PACKAGE_NAME], 'link:/tmp/x')
-  assert.deepEqual(applied.dsh.profile.bundles, ['@deepseek-ai/dsh-web-app', PACKAGE_NAME])
-  assert.deepEqual(applied.dsh.other, { keep: true })
-  assert.equal(describeStatus(applied).installed, true)
-
-  const removed = removeManifest(applied)
-  assert.equal(describeStatus(removed).installed, false)
-  assert.ok(!(`${PACKAGE_NAME}` in removed.dependencies))
-  assert.deepEqual(removed.dsh.profile.bundles, ['@deepseek-ai/dsh-web-app'])
+test('public CLI initializes absent profile; installer normalizes explicit relative links', (t) => {
+  const f = fixture(t)
+  ok(f.run(['--profile', 'sandbox_1', '--source', 'link:./local plugin']))
+  assert.equal(JSON.parse(f.raw('sandbox_1')).dependencies[PACKAGE_NAME], `link:${join(f.root, 'local plugin')}`)
+  assert.equal(f.raw(), null)
+  assert.deepEqual(readdirSync(join(f.home, 'profiles')), ['sandbox_1'])
 })
 
-test('install is idempotent; status reports; uninstall removes; data survives', async () => {
-  const env = tempHome()
-  try {
-    const profileDir = writeProfile(env.home)
-    const argv = ['--source', 'link:/tmp/dsh-token-usage']
+test('missing status and repeated uninstall are successful without creating a profile', (t) => {
+  const f = fixture(t)
+  for (const command of ['status', 'status', 'uninstall', 'uninstall']) {
+    const result = f.run([command])
+    ok(result)
+    assert.match(result.stdout, /not installed/)
+    assert.equal(existsSync(f.home), false)
+  }
+  assert.deepEqual(mutations(f), [])
+})
 
-    await run(argv, { home: env.home, installDeps: okInstall })
-    await run(argv, { home: env.home, installDeps: okInstall })
-    let manifest = readProfile(profileDir)
-    assert.equal(describeStatus(manifest).installed, true)
-    assert.deepEqual(manifest.dsh.profile.bundles.filter((name) => name === PACKAGE_NAME), [PACKAGE_NAME])
+test('status is read-only for installed, uninstalled and incomplete manifests', (t) => {
+  const f = fixture(t)
+  for (const manifest of [{}, { dependencies: { [PACKAGE_NAME]: DEFAULT_SOURCE } }, { dependencies: { [PACKAGE_NAME]: DEFAULT_SOURCE }, dsh: { profile: { bundles: [PACKAGE_NAME] } } }]) {
+    f.seed(manifest)
+    const before = f.raw()
+    const stat = statSync(f.manifestPath())
+    ok(f.run(['status']))
+    assert.equal(f.raw(), before)
+    assert.equal(statSync(f.manifestPath()).mtimeMs, stat.mtimeMs)
+  }
+  assert.deepEqual(mutations(f), [])
+})
 
-    await run(['status', '--source', 'x'], { home: env.home, installDeps: okInstall })
-    assert.equal(process.exitCode ?? 0, 0)
-    process.exitCode = undefined
+test('help works without a CLI or profile', (t) => {
+  const f = fixture(t)
+  const result = f.run(['--help'], { PATH: '' })
+  ok(result)
+  assert.match(result.stdout, /0\.1\.2-rc\.1/)
+  assert.match(result.stdout, /candidate/)
+  assert.equal(existsSync(f.home), false)
+  assert.deepEqual(f.calls(), [])
+})
 
-    await run(['uninstall'], { home: env.home, installDeps: okInstall })
-    manifest = readProfile(profileDir)
-    assert.equal(describeStatus(manifest).installed, false)
+test('malformed and ambiguous args fail before invoking dsh', (t) => {
+  const f = fixture(t)
+  for (const args of [['install', 'install'], ['install', 'status'], ['uninstall', 'status'], ['--profile'], ['--source'], ['--profile', '--help'], ['--profile', '../escape'], ['--profile', '/tmp/escape'], ['--profile', ''], ['--profile', 'web', '--profile', 'other'], ['--source', DEFAULT_SOURCE, '--source', DEFAULT_SOURCE], ['--source', 'link:'], ['--source', 'latest'], ['--source', 'github:shaomingbo/dsh-token-usage#main'], ['--unknown'], ['bogus']]) {
+    fails(f.run(args), /command|argument|option|profile|source/i)
+  }
+  assert.deepEqual(f.calls(), [])
+  assert.equal(existsSync(f.home), false)
+  assert.equal(parseArgs(['uninstall']).command, 'uninstall')
+})
 
-    await run(['uninstall'], { home: env.home, installDeps: okInstall }) // idempotent
-    assert.equal(readProfile(profileDir).dsh.other, undefined)
-  } finally {
-    env.cleanup()
+test('missing CLI fails closed for every operation even if no profile exists', (t) => {
+  const f = fixture(t)
+  for (const command of ['install', 'status', 'uninstall']) fails(f.run([command], { PATH: '' }), /dsh is missing.*0\.1\.2-rc\.1/)
+  assert.equal(existsSync(f.home), false)
+})
+
+test('wrong, unknown or failed version never mutates existing manifest', (t) => {
+  const f = fixture(t)
+  f.seed({ marker: 'retain' })
+  const before = f.raw()
+  for (const version of ['0.1.2-alpha.3', '0.1.2-rc.2', '0.1.2', 'unknown', 'dsh 0.1.2-rc.1']) fails(f.run([], { FAKE_VERSION: version }), /Unsupported dsh CLI version/)
+  fails(f.run([], { FAKE_MODE: 'version-fail' }), /Cannot determine/)
+  assert.equal(f.raw(), before)
+  assert.deepEqual(mutations(f), [])
+})
+
+test('only read-only launcher help is probed; plugin help must never initialize a profile', (t) => {
+  const f = fixture(t)
+  fails(f.run([], { FAKE_MODE: 'no-help' }), /read-only launcher help capability/)
+  assert.deepEqual(mutations(f), [])
+  assert.equal(existsSync(f.home), false)
+  ok(f.run(['status']))
+  assert.ok(f.calls().filter(args => args.includes('--help')).every(args => args.length === 1 && args[0] === '--help'))
+  assert.equal(existsSync(f.home), false)
+})
+
+test('malformed manifest fails without mutation or content disclosure', (t) => {
+  const f = fixture(t)
+  for (const raw of ['not json sensitive-marker', 'null', '[]', '{"dependencies":[]}', '{"dsh":{"profile":{"bundles":"bad"}}}', '{"dsh":{"profile":{"bundles":[null]}}}']) {
+    f.seed(raw)
+    const result = f.run()
+    fails(result, /Malformed profile manifest/)
+    assert.doesNotMatch(result.stderr, /sensitive-marker/)
+    assert.equal(f.raw(), raw)
+  }
+  assert.deepEqual(mutations(f), [])
+})
+
+test('CLI failure with preserved manifest is not reported as dependency rollback', (t) => {
+  const f = fixture(t)
+  f.seed({ dependencies: { other: '1' } })
+  const before = f.raw()
+  fails(f.run([], { FAKE_MODE: 'fail-clean' }), /manifest is unchanged; dependency state was not verified/)
+  assert.equal(f.raw(), before)
+  assert.equal(mutations(f).length, 1)
+})
+
+test('dirty CLI failure is detected, never overwritten by installer rollback', (t) => {
+  const f = fixture(t)
+  f.seed({ marker: 'keep' })
+  fails(f.run([], { FAKE_MODE: 'fail-dirty' }), /rollback is NOT confirmed/)
+  assert.equal(JSON.parse(f.raw()).dependencies[PACKAGE_NAME], DEFAULT_SOURCE)
+  assert.equal(mutations(f).length, 1)
+})
+
+test('CLI-created profile on failed initial install is retained and reported', (t) => {
+  const f = fixture(t)
+  fails(f.run([], { FAKE_MODE: 'fail-init' }), /manifest changed; rollback is NOT confirmed/)
+  assert.equal(JSON.parse(f.raw()).name, 'profile')
+})
+
+test('successful CLI prose cannot replace install manifest postconditions', (t) => {
+  const f = fixture(t)
+  for (const mode of ['lie', 'wrong-source', 'no-bundle', 'duplicate']) {
+    f.seed({})
+    fails(f.run([], { FAKE_MODE: mode }), /manifest postcondition failed/)
   }
 })
 
-test('install into a non-default profile targets that profile only', async () => {
-  const env = tempHome()
-  try {
-    const webDir = writeProfile(env.home, 'web')
-    const headlessDir = writeProfile(env.home, 'headless')
-    await run(['--profile', 'headless', '--source', 'link:/tmp/x'], { home: env.home, installDeps: okInstall })
-    assert.equal(describeStatus(readProfile(headlessDir)).installed, true)
-    assert.equal(describeStatus(readProfile(webDir)).installed, false)
-  } finally {
-    env.cleanup()
-  }
+test('uninstall checks postcondition and observes failed CLI rollback state', (t) => {
+  const f = fixture(t)
+  ok(f.run())
+  const before = f.raw()
+  fails(f.run(['uninstall'], { FAKE_MODE: 'lie' }), /manifest postcondition failed/)
+  assert.equal(f.raw(), before)
+  fails(f.run(['uninstall'], { FAKE_MODE: 'fail-clean' }), /manifest is unchanged/)
+  assert.equal(f.raw(), before)
+  fails(f.run(['uninstall'], { FAKE_MODE: 'fail-dirty' }), /rollback is NOT confirmed/)
+  assert.equal(JSON.parse(f.raw()).dependencies[PACKAGE_NAME], undefined)
 })
 
-test('dependency-install failure rolls the manifest back', async () => {
-  const env = tempHome()
-  try {
-    const original = { dependencies: { a: '1' }, dsh: { profile: { bundles: ['a'] } } }
-    const profileDir = writeProfile(env.home, 'web', original)
-    await assert.rejects(
-      () => run(['--source', 'link:/tmp/x'], { home: env.home, installDeps: failingInstall }),
-      /pnpm exploded/,
-    )
-    assert.deepEqual(readProfile(profileDir), original)
-  } finally {
-    env.cleanup()
-  }
+for (const kind of ['symlink', 'hardlink']) test(`rejects ${kind} profile manifests without reading or changing their target`, t => {
+  const f = fixture(t)
+  const target = join(f.root, 'unrelated.json')
+  const raw = '{"privateFixture":"must-not-appear"}'
+  writeFileSync(target, raw)
+  mkdirSync(dirname(f.manifestPath()), { recursive: true })
+  if (kind === 'symlink') symlinkSync(target, f.manifestPath()); else linkSync(target, f.manifestPath())
+  const result = f.run(['status'])
+  fails(result, /UNSAFE_PROFILE_MANIFEST/)
+  assert.doesNotMatch(result.stderr, /must-not-appear/)
+  assert.equal(readFileSync(target, 'utf8'), raw)
+  assert.deepEqual(mutations(f), [])
 })
 
-test('uninstall failure rolls the manifest back', async () => {
-  const env = tempHome()
-  try {
-    const original = applyManifest({ dependencies: {}, dsh: { profile: { bundles: [] } } }, 'github:x#v1')
-    const profileDir = writeProfile(env.home, 'web', original)
-    await assert.rejects(
-      () => run(['uninstall'], { home: env.home, installDeps: failingInstall }),
-      /pnpm exploded/,
-    )
-    assert.deepEqual(readProfile(profileDir), original)
-  } finally {
-    env.cleanup()
-  }
-})
-
-test('status fails with exit code 1 when not installed', async () => {
-  const env = tempHome()
-  try {
-    writeProfile(env.home)
-    await run(['status'], { home: env.home, installDeps: okInstall })
-    assert.equal(process.exitCode, 1)
-    process.exitCode = undefined
-  } finally {
-    env.cleanup()
-  }
-})
-
-test('malformed manifest and missing profile produce clear errors', async () => {
-  const env = tempHome()
-  try {
-    const profileDir = writeProfile(env.home)
-    writeFileSync(join(profileDir, 'package.json'), '{not json')
-    await assert.rejects(() => run([], { home: env.home, installDeps: okInstall }))
-    await assert.rejects(() => run(['--profile', 'missing'], { home: env.home, installDeps: okInstall }), /ENOENT/)
-  } finally {
-    env.cleanup()
-  }
+test('rejects redirected profile directories before invoking mutations', t => {
+  const f = fixture(t)
+  const target = join(f.root, 'unrelated-directory')
+  mkdirSync(target)
+  mkdirSync(f.home)
+  symlinkSync(target, join(f.home, 'profiles'))
+  fails(f.run(), /UNSAFE_PROFILE_DIRECTORY/)
+  assert.deepEqual(readdirSync(target), [])
+  assert.deepEqual(mutations(f), [])
 })

@@ -9,7 +9,10 @@ const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'
 test('package manifest follows the bundle conventions', async () => {
   assert.equal(manifest.type, 'module')
   assert.equal(manifest.main, 'lib/index.js')
-  assert.deepEqual(Object.keys(manifest.exports).sort(), ['.', './client', './cordis.patch.yml', './package.json'])
+  assert.deepEqual(Object.keys(manifest.exports).sort(), ['.', './client', './codex-runtime', './cordis.patch.yml', './package.json'])
+  assert.equal(manifest.exports['./codex-runtime'], './lib/capabilities/codex-native/runtime.js')
+  assert.equal(manifest.dependencies['@earendil-works/pi-ai'], '0.82.1', 'existing auth SDK remains pinned')
+  assert.equal(manifest.dependencies['pi-ai-codex-native'], 'npm:@earendil-works/pi-ai@0.84.4')
   assert.equal(manifest.bin[manifest.name], 'bin/install.js')
   assert.equal(manifest.license, 'MIT')
   assert.equal(manifest.dsh.bundle.patch, './cordis.patch.yml')

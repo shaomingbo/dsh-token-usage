@@ -1,12 +1,13 @@
 {
   "name": "dsh-token-usage",
-  "version": "5.0.24",
-  "description": "DSH Accounts & Usage: unified provider connections, official allowance observations, and a separate local usage ledger. No telemetry, prompts, or secrets in SQLite/RPC/log/export.",
+  "version": "5.1.0-rc.1",
+  "description": "DSH Accounts & Usage: unified provider connections, official allowance observations, a separate local usage ledger, and the owner-bound codex-runtime/v1 native capability. No telemetry, prompts, or secrets in SQLite/RPC/log/export.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./codex-runtime": "./lib/capabilities/codex-native/runtime.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -19,6 +20,7 @@
     "lib",
     "README.md",
     "README.zh.md",
+    "CHANGELOG.md",
     "CONTEXT.md",
     "SPEC.md",
     "docs/research",
@@ -65,6 +67,7 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.82.1"
+    "@earendil-works/pi-ai": "0.82.1",
+    "pi-ai-codex-native": "npm:@earendil-works/pi-ai@0.84.4"
   }
 }

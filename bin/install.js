@@ -1,190 +1,203 @@
 #!/usr/bin/env node
-
+// Public CLI profile adapter (dsh-plugin-release contract). Every mutation is
+// delegated to the public `dsh plugin` CLI of the exact tested DSH version;
+// lifecycle scripts stay disabled; results are judged by exit status and
+// manifest postconditions, never by human-readable prose. There is NO direct
+// manifest fallback: if dsh is missing, unsupported, or the command fails,
+// the installer fails closed with honest reporting (rc.1 does not promise
+// rollback). This installer never starts, stops, restarts or replaces DSH.
 import { spawnSync } from 'node:child_process'
-import { realpathSync, readFileSync } from 'node:fs'
-import { readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { realpathSync } from 'node:fs'
+import { readFileSync, lstatSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const PACKAGE_NAME = 'dsh-token-usage'
+export const SUPPORTED_DSH_VERSION = '0.1.2-rc.1'
 // Default source derives from this package's own version so the pinned tag can
 // never drift behind a release again (v5.0.23 shipped pinned to v5.0.22).
 const PACKAGE_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 export const DEFAULT_SOURCE = `github:shaomingbo/dsh-token-usage#v${PACKAGE_VERSION.version}`
+const CLI_GUIDANCE = `Install @deepseek-ai/dsh@${SUPPORTED_DSH_VERSION} and pnpm, put its dsh executable on PATH, then check dsh --version. No manifest fallback is available.`
 const COMMANDS = ['install', 'status', 'uninstall']
 
-export function parseArgs(argv) {
-  const result = {
-    command: 'install',
-    profile: 'web',
-    source: process.env.DSH_TOKEN_USAGE_SOURCE || DEFAULT_SOURCE,
+export function validateProfile(profile) {
+  if (typeof profile !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(profile)) {
+    throw new Error('--profile must be a simple name (letters, digits, hyphens or underscores), not a path')
   }
+  return profile
+}
+
+export function normalizeSource(source, cwd = process.cwd()) {
+  if (source === DEFAULT_SOURCE) return source
+  if (typeof source === 'string' && source.startsWith('link:') && source.slice(5).trim() && !/[\x00-\x1f\x7f]/.test(source)) {
+    return `link:${resolve(cwd, source.slice(5))}`
+  }
+  throw new Error(`--source must be ${DEFAULT_SOURCE} or an explicit link:<local-path>; floating sources are not supported`)
+}
+
+export function parseArgs(argv) {
+  const options = { command: 'install', profile: 'web', source: process.env.DSH_TOKEN_USAGE_SOURCE || DEFAULT_SOURCE }
+  const seen = new Set()
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
-    if (arg === '--profile') result.profile = argv[++index]
-    else if (arg === '--source') result.source = argv[++index]
-    else if (arg === '--help' || arg === '-h') result.help = true
-    else if (COMMANDS.includes(arg)) {
-      if (result.command !== 'install') throw new Error(`unexpected argument: ${arg}`)
-      result.command = arg
-    }
-    else throw new Error(`unknown argument: ${arg}`)
+    if (arg === '--help' || arg === '-h') { options.help = true; continue }
+    if (COMMANDS.includes(arg)) {
+      if (seen.has('command')) throw new Error(`unexpected argument: ${arg}`)
+      seen.add('command')
+      options.command = arg
+    } else if (arg === '--profile' || arg === '--source') {
+      if (seen.has(arg)) throw new Error(`Duplicate option: ${arg}`)
+      seen.add(arg)
+      const value = argv[++index]
+      if (!value || value.startsWith('-')) throw new Error(`${arg} requires a value`)
+      options[arg.slice(2)] = value
+    } else throw new Error(`unknown argument: ${arg}`)
   }
-  if (!result.profile || !result.source) throw new Error('--profile and --source require values')
-  return result
+  if (!options.profile || !options.source) throw new Error('--profile and --source require values')
+  validateProfile(options.profile)
+  options.source = normalizeSource(options.source)
+  return options
 }
 
-export function applyManifest(manifest, source) {
-  const next = {
-    ...manifest,
-    dependencies: { ...(manifest.dependencies ?? {}) },
-    dsh: {
-      ...(manifest.dsh ?? {}),
-      profile: {
-        ...(manifest.dsh?.profile ?? {}),
-        bundles: [...(manifest.dsh?.profile?.bundles ?? [])],
-      },
-    },
-  }
-  next.dependencies[PACKAGE_NAME] = source
-  if (!next.dsh.profile.bundles.includes(PACKAGE_NAME)) {
-    next.dsh.profile.bundles.push(PACKAGE_NAME)
-  }
-  return next
-}
+export const HELP = `Usage: ${PACKAGE_NAME} [install|status|uninstall] [--profile <name>] [--source <source>]
 
-export function removeManifest(manifest) {
-  const next = { ...manifest }
-  if (next.dependencies && PACKAGE_NAME in next.dependencies) {
-    next.dependencies = { ...next.dependencies }
-    delete next.dependencies[PACKAGE_NAME]
-  }
-  if (Array.isArray(next.dsh?.profile?.bundles)) {
-    const bundles = next.dsh.profile.bundles.filter((name) => name !== PACKAGE_NAME)
-    if (bundles.length !== next.dsh.profile.bundles.length) {
-      next.dsh = {
-        ...next.dsh,
-        profile: { ...next.dsh.profile, bundles },
-      }
-    }
-  }
-  return next
-}
+No command means install. Default profile: web.
+  install       Install the bundle through the public dsh plugin CLI (idempotent)
+  status        Read-only manifest status; absent/uninstalled is a successful result
+  uninstall     Remove the dependency and bundle (idempotent; the usage database is kept)
+  --profile     Simple profile name, not a path
+  --source      ${DEFAULT_SOURCE}
+                or explicit link:<local-path> (relative to the invoking directory)
+  -h, --help    Show help without requiring dsh or accessing a profile
 
-export function describeStatus(manifest) {
-  const source = manifest.dependencies?.[PACKAGE_NAME] ?? null
-  const bundled = Array.isArray(manifest.dsh?.profile?.bundles)
-    && manifest.dsh.profile.bundles.includes(PACKAGE_NAME)
-  return { installed: Boolean(source) && bundled, source, bundled }
-}
+Requires exactly dsh ${SUPPORTED_DSH_VERSION} on PATH. Check dsh --version.
+All dependency operations pass --ignore-scripts. No direct manifest writes or fallback.
+The fixed release tag is a candidate; its publication is not assumed.
+The public CLI owns transactions; a failure does not guarantee dependency rollback.
+This installer never starts, stops or restarts DSH. After a bundle change, manually
+restart the corresponding profile when convenient. For Web, hard-refresh the existing GUI.
+`
 
-export function runPnpmInstall(profileDir, { spawn = spawnSync } = {}) {
-  const attempts = [
-    ['pnpm', ['install', '--ignore-scripts']],
-    ['corepack', ['pnpm', 'install', '--ignore-scripts']],
-  ]
-  for (const [command, args] of attempts) {
-    const result = spawn(command, args, { cwd: profileDir, stdio: 'inherit' })
-    if (!result.error && result.status === 0) return
-    if (result.error?.code !== 'ENOENT') {
-      throw new Error(`${command} ${args.join(' ')} failed with exit code ${result.status}`)
-    }
-  }
-  throw new Error('pnpm is unavailable; install pnpm or enable it with corepack')
-}
-
-async function atomicWrite(path, content) {
-  const temp = `${path}.${PACKAGE_NAME}.tmp`
+function readSnapshot(path) {
   try {
-    await writeFile(temp, content, 'utf8')
-    await rename(temp, path)
+    const entry = lstatSync(path)
+    if (entry.isSymbolicLink() || !entry.isFile() || entry.nlink !== 1) throw Object.assign(new Error(), { code: 'UNSAFE_PROFILE_MANIFEST' })
+    return readFileSync(path, 'utf8')
   } catch (error) {
-    await unlink(temp).catch(() => {})
-    throw error
+    if (error.code === 'ENOENT') return null
+    throw new Error(`Cannot read profile manifest ${path}: ${error.code ?? 'read failed'}`)
   }
 }
 
-function printHelp() {
-  console.log(`Usage: ${PACKAGE_NAME} [command] [--profile web] [--source ${DEFAULT_SOURCE}]
-
-Commands:
-  install     Add DSH Accounts & Usage to the profile (default)
-  status      Show whether DSH Accounts & Usage is installed
-  uninstall   Remove DSH Accounts & Usage from the profile (idempotent)
-
-Options:
-  --profile <name>   Target DSH profile (default: web)
-  --source <source>  Package source (default: ${DEFAULT_SOURCE},
-                     override with the DSH_TOKEN_USAGE_SOURCE environment variable)
-  -h, --help         Show this help
-
-The installer only edits dependencies.${PACKAGE_NAME} and dsh.profile.bundles in
-the profile package.json, then runs pnpm install --ignore-scripts there.
-It never stops or restarts DSH; restart DSH manually afterwards.
-Your usage database is kept on uninstall.`)
+function object(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
-export async function run(argv = process.argv.slice(2), deps = {}) {
-  const installDeps = deps.installDeps ?? runPnpmInstall
+/** Manifest-only status; credentials, settings, lockfiles and the ledger are never read. */
+export function describeStatus(raw, path = '(profile)') {
+  if (raw === null) return { installed: false, source: null, bundled: false, manifestExists: false }
+  let manifest
+  try { manifest = JSON.parse(raw) } catch { throw new Error(`Malformed profile manifest: ${path}`) }
+  if (!object(manifest)
+    || (manifest.dependencies !== undefined && !object(manifest.dependencies))
+    || (manifest.dsh !== undefined && !object(manifest.dsh))
+    || (manifest.dsh?.profile !== undefined && !object(manifest.dsh.profile))
+    || (manifest.dsh?.profile?.bundles !== undefined && (!Array.isArray(manifest.dsh.profile.bundles) || !manifest.dsh.profile.bundles.every((entry) => typeof entry === 'string')))) {
+    throw new Error(`Malformed profile manifest structure: ${path}`)
+  }
+  const hasDependency = Object.hasOwn(manifest.dependencies ?? {}, PACKAGE_NAME)
+  const source = hasDependency ? manifest.dependencies[PACKAGE_NAME] : null
+  if (hasDependency && (typeof source !== 'string' || !source)) throw new Error(`Malformed plugin dependency in ${path}`)
+  const count = (manifest.dsh?.profile?.bundles ?? []).filter((entry) => entry === PACKAGE_NAME).length
+  return { installed: source !== null && count === 1, source, bundled: count > 0, manifestExists: true }
+}
+
+function invoke(args, env) {
+  // No shell, no direct pnpm calls, no private DSH imports.
+  return spawnSync('dsh', args, { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1024 * 1024, timeout: 300000 })
+}
+
+function success(result) {
+  return !result.error && result.status === 0
+}
+
+function checkCli(env) {
+  const version = invoke(['--version'], env)
+  if (version.error?.code === 'ENOENT') throw new Error(`dsh is missing from PATH. ${CLI_GUIDANCE}`)
+  if (!success(version)) throw new Error(`Cannot determine dsh CLI version. ${CLI_GUIDANCE}`)
+  // --version is the version contract; never infer command success from prose.
+  const actual = version.stdout.trim()
+  if (actual !== SUPPORTED_DSH_VERSION) throw new Error(`Unsupported dsh CLI version ${JSON.stringify(actual)}; require exactly ${SUPPORTED_DSH_VERSION}. ${CLI_GUIDANCE}`)
+  // Do NOT probe `dsh plugin ... --help`: in published rc.1 help is forwarded
+  // to pnpm AFTER profile initialization. Only launcher help is read-only.
+  if (!success(invoke(['--help'], env))) throw new Error(`dsh ${SUPPORTED_DSH_VERSION} lacks the required read-only launcher help capability. ${CLI_GUIDANCE}`)
+}
+
+/**
+ * The public CLI owns all writes and dependency transactions, including recovery.
+ * rc.1 does not promise rollback: report changed manifests, never overwrite them.
+ * Only the profile package.json is inspected.
+ */
+export function runProfileAction({ command = 'install', profile = 'web', source = DEFAULT_SOURCE } = {}, { env = process.env, cwd = process.cwd() } = {}) {
+  if (!COMMANDS.includes(command)) throw new Error(`Unknown command: ${command}`)
+  validateProfile(profile)
+  source = normalizeSource(source, cwd)
+  const home = resolve(cwd, env.DSH_HOME || join(homedir(), '.dsh'))
+  const path = join(home, 'profiles', profile, 'package.json')
+  const cliEnv = { ...env, DSH_HOME: home, npm_config_ignore_scripts: 'true' }
+  checkCli(cliEnv)
+  for (const directory of [join(home, 'profiles'), join(home, 'profiles', profile)]) {
+    try {
+      const entry = lstatSync(directory)
+      if (entry.isSymbolicLink() || !entry.isDirectory()) throw Object.assign(new Error(), { code: 'UNSAFE_PROFILE_DIRECTORY' })
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw new Error(`Cannot safely inspect profile directory (${error.code ?? 'read failed'}).`)
+    }
+  }
+  const before = readSnapshot(path)
+  const status = describeStatus(before, path)
+  if (command === 'status') return { ...status, profile, changed: false }
+  if ((command === 'install' && status.installed && status.source === source)
+    || (command === 'uninstall' && status.source === null && !status.bundled)) {
+    return { ...status, profile, changed: false }
+  }
+  // pnpm 11's remove command rejects the --ignore-scripts shorthand. Its
+  // documented config form enforces the same policy without a retry/fallback.
+  const noScripts = command === 'install' ? '--ignore-scripts' : '--config.ignore-scripts=true'
+  const args = ['plugin', '--profile', profile, command === 'install' ? 'add' : 'remove', command === 'install' ? source : PACKAGE_NAME, noScripts]
+  const result = invoke(args, cliEnv)
+  let after
+  try { after = readSnapshot(path) } catch {
+    throw new Error('Cannot verify profile manifest after public dsh CLI operation. State is unknown; inspect the profile manually. No installer rollback was attempted.')
+  }
+  if (!success(result)) {
+    const state = before === after ? 'Profile manifest is unchanged; dependency state was not verified.' : 'Profile manifest changed; rollback is NOT confirmed. Inspect the profile manually before retrying.'
+    throw new Error(`Public dsh plugin ${command === 'install' ? 'add' : 'remove'} failed (exit ${result.status ?? result.error?.code ?? 'unknown'}). ${state} The public CLI owns the transaction; no installer rollback or fallback was attempted.`)
+  }
+  const final = describeStatus(after, path)
+  const satisfied = command === 'install'
+    ? final.installed && final.source === source
+    : final.source === null && !final.bundled
+  if (!satisfied) throw new Error(`Public dsh CLI exited successfully but ${command} manifest postcondition failed. Inspect ${path}; no fallback or automatic rollback was attempted.`)
+  return { ...final, profile, changed: before !== after }
+}
+
+export function run(argv = process.argv.slice(2)) {
   const options = parseArgs(argv)
   if (options.help) {
-    printHelp()
+    console.log(HELP)
     return
   }
-
-  const home = resolve(deps.home ?? process.env.DSH_HOME ?? join(homedir(), '.dsh'))
-  const profileDir = join(home, 'profiles', options.profile)
-  const packagePath = join(profileDir, 'package.json')
-
+  const result = runProfileAction(options)
+  console.log(`${PACKAGE_NAME} in profile ${options.profile}: ${result.installed ? 'installed' : result.source !== null || result.bundled ? 'incomplete' : 'not installed'}`)
   if (options.command === 'status') {
-    const manifest = JSON.parse(await readFile(packagePath, 'utf8'))
-    const status = describeStatus(manifest)
-    console.log(`${PACKAGE_NAME} in profile ${options.profile}: ${status.installed ? 'installed' : 'not installed'}`)
-    console.log(`  dependency: ${status.source ?? '(absent)'}`)
-    console.log(`  bundle entry: ${status.bundled ? 'present' : 'absent'}`)
-    if (!status.installed) process.exitCode = 1
-    return
-  }
-
-  if (options.command === 'uninstall') {
-    const original = await readFile(packagePath, 'utf8')
-    const manifest = JSON.parse(original)
-    const status = describeStatus(manifest)
-    if (!status.source && !status.bundled) {
-      console.log(`${PACKAGE_NAME} is not installed in profile ${options.profile}; nothing to do.`)
-      return
-    }
-    const next = removeManifest(manifest)
-    await atomicWrite(packagePath, `${JSON.stringify(next, null, 2)}\n`)
-    try {
-      await installDeps(profileDir)
-    } catch (error) {
-      await atomicWrite(packagePath, original)
-      throw error
-    }
-    console.log(`\nRemoved ${PACKAGE_NAME} from ${profileDir}`)
-    console.log(`Accounts & Usage data is kept in the profile data directory; delete it there if you want a full wipe.`)
-    console.log('Restart DSH and hard-refresh the Web page to unload the bundle.')
-    return
-  }
-
-  const original = await readFile(packagePath, 'utf8')
-  const next = applyManifest(JSON.parse(original), options.source)
-  await atomicWrite(packagePath, `${JSON.stringify(next, null, 2)}\n`)
-  try {
-    await installDeps(profileDir)
-  } catch (error) {
-    await atomicWrite(packagePath, original)
-    throw error
-  }
-
-  console.log(`\nInstalled ${PACKAGE_NAME} into ${profileDir}`)
-  console.log('Restart DSH and hard-refresh the Web page so DSH Accounts & Usage enters the boot graph.')
-}
-
-async function main() {
-  await run()
+    console.log(`dependency: ${result.source ?? '(absent)'}; bundle entry: ${result.bundled ? 'present' : 'absent'}`)
+  } else if (result.changed) {
+    console.log('Bundle set changed. Manually restart the corresponding DSH profile when convenient; for Web, hard-refresh the existing GUI. No server lifecycle action was performed.')
+  } else console.log('No change needed.')
+  return result
 }
 
 // Node resolves the ESM entry through symlinks, so /var/folders/… or /tmp/…
@@ -198,11 +211,9 @@ function invokedDirectly() {
   }
 }
 
-const invoked = invokedDirectly()
-if (invoked) {
-  main().catch((error) => {
-    const script = fileURLToPath(import.meta.url)
-    console.error(`${script}: ${error instanceof Error ? error.message : String(error)}`)
+if (invokedDirectly()) {
+  try { run() } catch (error) {
+    console.error(`${PACKAGE_NAME}: ${error.message}`)
     process.exitCode = 1
-  })
+  }
 }

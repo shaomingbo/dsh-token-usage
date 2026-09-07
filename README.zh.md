@@ -1,31 +1,31 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.0.0 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。
+`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.0-rc.1` 发布候选新增由账户所有者绑定的 `codex-runtime/v1` 能力（见下文）；在固定 tag 实际推送并核验之前，它不是已发布产物。
 
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.22
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1
 ```
 
-默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
+默认安装到 `web` profile。**固定 tag 是发布候选；不假定其已发布。** 安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.22 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.22 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.22 --profile web --source github:shaomingbo/dsh-token-usage#v5.0.22
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.22 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0-rc.1
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到 `v5.0.22` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.0-rc.1` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在精确的 `dsh` `0.1.2-rc.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.0.22 --source link:$PWD
+node bin/install.js --source link:$PWD
 ```
 
-安装器只原子修改 `dependencies["dsh-token-usage"]` 和 `dsh.profile.bundles`，执行 `pnpm install --ignore-scripts`（含 corepack 回退），失败时恢复 manifest。手工修改同样两个字段仅作为兜底。
+只接受固定候选源或显式 `link:<本地路径>`；浮动源会被拒绝。
 
 ## 账户生命周期（v5）
 
@@ -66,14 +66,27 @@ Ollama Cloud 当前的 Chat Completions 用量没有可靠提供缓存命中 Tok
 ## 开发检查
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile --ignore-scripts
 npm run check
-npm pack --dry-run
+npm pack --dry-run --ignore-scripts
 ```
 
 `npm run bench:v2` 是仅开发用的分析基准，不随包发布。
 
-测试只使用合成数据和临时 `DSH_HOME`。当前能力针对原装 DSH 0.1.1-rc.2、DSH 0.1.2-alpha.2 与 Node 22.19+ 验证，不宣称更广兼容性。
+测试只使用合成数据和临时 `DSH_HOME`。本发布候选实际验证环境为原装 DSH `0.1.2-rc.1`、Node 24.18.0/macOS arm64；新原生能力尚未在更低 Node 版本重跑；安装器拒绝其他 `dsh` CLI 版本。旧版本的兼容结论不沿用到本包，也不宣称更广兼容性。
+
+## Codex 原生能力（5.1.0-rc.1 发布候选）
+
+本版本提供由账户所有者绑定的 `codex-runtime/v1` 能力，供配套的
+`dsh-codex-compaction` 0.3.0-rc.1 候选调用：经既有 ChatGPT 连接做原生压缩/重放，
+OAuth 值始终留在账户所有者内部，不另造登录或凭据存储。自定义模型（如
+`gpt-6-astra`）只经可信 model-facts 接缝从公开的宿主配置 profile 字段解析；
+缺失或冲突的 metadata 以固定词表缺口报告，绝不编造数值。**两个 RC 候选均非
+稳定版**——不能认为已发布的 5.0.24 已含此能力，固定 tag 仅在实际推送并核验后才成立。
+
+若本 checkout 的 `node_modules` 链接 live profile，不要在这里安装依赖。请在配套
+压缩项目运行 `npm run test:accounts-integration -- <isolated-account-source>`，它会创建临时源码/依赖副本验证，
+不碰现网。详见[能力契约与隔离验证说明](docs/research/codex-runtime-v1.md)。
 
 ## 许可证
 
