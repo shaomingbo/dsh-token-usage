@@ -93,7 +93,7 @@ test('parseArgs defaults to install on the web profile with the version-derived 
   assert.equal(options.source, DEFAULT_SOURCE)
   const packageVersion = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
   assert.equal(DEFAULT_SOURCE, `github:shaomingbo/dsh-token-usage#v${packageVersion}`)
-  assert.match(DEFAULT_SOURCE, /#v5\.1\.0-rc\.1$/)
+  assert.match(DEFAULT_SOURCE, /^github:shaomingbo\/dsh-token-usage#v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
 })
 
 test('environment source override is honored and normalized like --source', () => {

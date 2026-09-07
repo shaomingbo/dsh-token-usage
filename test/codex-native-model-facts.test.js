@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCodexModelFacts } from '../lib/capabilities/codex-native/model-facts.js';
+import { createCodexRuntime } from '../lib/capabilities/codex-native/runtime.js';
 
 const REF = 'OPENAI_CODEX_ACCESS_TOKEN';
 const astraProfile = { id: 'gpt-6-astra', contextWindow: 872000, maxTokens: 128000, input: ['text', 'image'],
@@ -77,4 +78,43 @@ test('invalid profile values are concrete gaps, never coerced or invented', asyn
 test('gap passthrough carries the route verdict for inapplicable routes', async () => {
   const facts = createCodexModelFacts({ getSettings: settings({ apiKeyEnv: 'OTHER_REF', models: [astraProfile] }), credentialRef: REF });
   assert.deepEqual(await facts.resolveModelFacts('gpt-6-astra'), { gap: 'ROUTE_AUTH' });
+});
+
+test('a schema-materialized empty input array inherits the host default; only nonempty overrides', async () => {
+  // The host settings schema materializes an omitted model-profile input list
+  // to [] (verified end-to-end against the real public Config in the paired
+  // cross-plugin suite). The public PiAiModelProfile contract says absent OR
+  // empty both inherit the catalog/host default.
+  const inherited = createCodexModelFacts({
+    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', reasoningEfforts: { low: 'low' }, input: [] }] }),
+    resolveModelInfo: async () => ({ context: { contextWindow: 272000 }, inputModalities: ['text', 'image'] }),
+    credentialRef: REF,
+  });
+  assert.deepEqual(await inherited.resolveModelFacts('gpt-5.6-sol'),
+    { id: 'gpt-5.6-sol', contextWindow: 272000, input: ['text', 'image'], reasoningEfforts: { low: 'low' } },
+    'an empty materialized input array falls back to the host-resolved modalities');
+
+  const withoutHost = createCodexModelFacts({
+    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', contextWindow: 272000, maxTokens: 128000, input: [] }] }),
+    credentialRef: REF,
+  });
+  assert.deepEqual(await withoutHost.resolveModelFacts('gpt-5.6-sol'),
+    { id: 'gpt-5.6-sol', contextWindow: 272000, maxTokens: 128000 },
+    'with no host resolution the runtime keeps the pinned catalog modalities');
+
+  // Nonempty illegal modalities stay fail-closed: they are passed to the
+  // runtime, whose customModel validation rejects them.
+  const illegal = createCodexModelFacts({
+    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', input: ['video'] }] }),
+    resolveModelInfo: async () => ({ context: { contextWindow: 272000 }, inputModalities: ['text', 'image'] }),
+    credentialRef: REF,
+  });
+  const illegalFacts = await illegal.resolveModelFacts('gpt-5.6-sol');
+  assert.deepEqual(illegalFacts.input, ['video'], 'illegal nonempty modalities are never silently replaced');
+  const runtime = createCodexRuntime({ timeoutMs: 30000, configured: () => true,
+    resolveOAuth: () => { throw new Error('must not resolve auth'); },
+    fetchImpl: async () => { throw new Error('must not fetch'); },
+    resolveModelFacts: async () => illegalFacts, routeStatus: () => ({ ok: true }) });
+  await assert.rejects(runtime.open({ model: 'gpt-5.6-sol' }), error => error.code === 'CODEX_RUNTIME_MODEL_METADATA');
+  runtime.dispose();
 });

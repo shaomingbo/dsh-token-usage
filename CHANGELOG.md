@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.1.0-rc.2 (release candidate)
+
+- Treat a schema-materialized empty model `input` array as unspecified, matching the public PiAiModelProfile contract; inherit host/catalog modalities instead of rejecting Sol with MODEL_METADATA.
+- Preserve fail-closed validation of illegal nonempty modalities and every existing account/checkpoint binding.
+- Verified with the real public settings schema, 240 account tests and 12 paired integration tests. Live Sol verification follows explicit candidate installation; no broader release claim is made.
+- Pair with unchanged `dsh-codex-compaction` 0.3.0-rc.1. Prior RC tags are immutable.
+
 ## 5.1.0-rc.1 (release candidate)
 
 Owner account companion release for `dsh-codex-compaction` 0.3.0-rc.1.

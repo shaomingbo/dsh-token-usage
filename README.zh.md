@@ -1,23 +1,23 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.0-rc.1` 发布候选新增由账户所有者绑定的 `codex-runtime/v1` 能力（见下文）；在固定 tag 实际推送并核验之前，它不是已发布产物。
+`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.0-rc.2` 发布候选新增由账户所有者绑定的 `codex-runtime/v1` 能力（见下文）；在固定 tag 实际推送并核验之前，它不是已发布产物。
 
 ## 安装
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2
 ```
 
 默认安装到 `web` profile。**固定 tag 是发布候选；不假定其已发布。** 安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0-rc.1
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.1 --help
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 status
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 uninstall
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0-rc.2
+npx --yes github:shaomingbo/dsh-token-usage#v5.1.0-rc.2 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.0-rc.1` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在精确的 `dsh` `0.1.2-rc.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.0-rc.2` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在精确的 `dsh` `0.1.2-rc.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 
@@ -75,7 +75,7 @@ npm pack --dry-run --ignore-scripts
 
 测试只使用合成数据和临时 `DSH_HOME`。本发布候选实际验证环境为原装 DSH `0.1.2-rc.1`、Node 24.18.0/macOS arm64；新原生能力尚未在更低 Node 版本重跑；安装器拒绝其他 `dsh` CLI 版本。旧版本的兼容结论不沿用到本包，也不宣称更广兼容性。
 
-## Codex 原生能力（5.1.0-rc.1 发布候选）
+## Codex 原生能力（5.1.0-rc.2 发布候选）
 
 本版本提供由账户所有者绑定的 `codex-runtime/v1` 能力，供配套的
 `dsh-codex-compaction` 0.3.0-rc.1 候选调用：经既有 ChatGPT 连接做原生压缩/重放，
