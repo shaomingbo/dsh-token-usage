@@ -1,5 +1,20 @@
 # Changelog
 
+## 5.1.3
+
+- Pair with compaction 0.3.2: ordinary production leases use 1800000ms absolute total,
+  120000ms preparation, and the companion's published 300000ms output-idle watchdog.
+  Continuous generation no longer hits the former 120000ms total cutoff.
+- Bound metadata-only applicability and ordinary model/readiness/auth setup separately;
+  setup completion does not refund time or renew the total lease.
+- Keep compaction purpose at 300000ms total and preserve recovery, first stop reason,
+  account binding, cancellation and checkpoint-format contracts. Short explicitly configured
+  budgets remain short; implicit compact defaults are capped at 300000ms.
+- Optional numeric diagnostics add setup/total/timeout budgets and a fixed setup|total
+  timeout kind. No raw request, credential, event or opaque history is logged.
+- Publication, isolated tag installation and current-GUI verification are separate gates;
+  the historical 5.1.2 real-run evidence below is not evidence for this candidate.
+
 ## 5.1.2
 
 Paired with `dsh-codex-compaction` `0.3.1`; tag identity and release-tag installation

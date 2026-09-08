@@ -1,8 +1,38 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches. The `5.1.2` release carries the live-accepted `codex-runtime/v1` recovery fix, paired with `dsh-codex-compaction` `0.3.1`. Use the matching fixed tags below; publication identity and release-tag installation checks are recorded in the GitHub releases. Historical `5.1.0`/`5.1.1` and RC tags (`5.1.0-rc.1`, `5.1.0-rc.2`) and their evidence are retained.
+`dsh-token-usage` 5.x keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches. The `5.1.3` release fixes ordinary `codex-runtime/v1` request deadlines, paired with `dsh-codex-compaction` `0.3.2`, while preserving the historical `5.1.2`/`0.3.1` recovery behavior. Use the matching fixed tags below; publication identity and release-tag installation checks are recorded in the GitHub releases. Historical `5.1.0`/`5.1.1` and RC tags (`5.1.0-rc.1`, `5.1.0-rc.2`) and their evidence are retained.
 
-## 5.1.2 native-runtime correction
+## 5.1.3 ordinary-generation deadline correction
+
+Pair this release with `dsh-codex-compaction` 0.3.2. Ordinary native replay no longer
+uses a 120-second total generation cap: production `open()` has an absolute **1800-second**
+lease, including preparation, and a separate **120-second** model/readiness/authentication
+setup limit that is removed on successful binding. The companion uses the published
+PiAiAdapter **300-second idle watchdog** for text, reasoning and tool-argument output.
+Network keepalives do not count as model output. Output re-arms idle waiting, never the
+owner's absolute deadline. Consumers of the owner capability without the companion's
+converter get the owner deadline, not an implicit second idle watchdog.
+
+Explicit native compaction remains **300 seconds total**, including all recovery attempts;
+its converter remains 300 seconds as well. No retries, fallback requests, provider creation,
+or account switches reset an existing lease. Caller cancellation and first stop reasons
+remain authoritative; credentials and the v1 checkpoint format are unchanged.
+
+The trusted owner factory retains `timeoutMs` as a total-budget option (default 30000ms,
+maximum 1800000ms), adds `setupTimeoutMs` (default `min(timeoutMs,120000)`, maximum 120000ms),
+and defaults `compactionTimeoutMs` to `min(timeoutMs,300000)` rather than widening compaction
+implicitly. Ordinary setup and metadata-only applicability use the smaller setup/total budget.
+No arbitrary timeout option is added to the public `open()` capability or model tools.
+Optional diagnostics retain `budgetMs` and add `totalBudgetMs`, `setupBudgetMs`,
+`timeoutBudgetMs` and `timeoutKind: setup|total`; fields absent in older owners remain absent.
+Owner expiration remains `CODEX_RUNTIME_TIMEOUT`; the companion reports a fixed idle-timeout
+message with code `TIMEOUT`, without exposing raw SDK diagnostics. Old v1 owners/readers stay
+compatible but do not acquire the new budgets merely by updating one side.
+
+Local tests, immutable release identity, tag installation and original-GUI acceptance are
+recorded separately; the contract alone does not establish live acceptance. Finite budgets do not guarantee completion of arbitrary model requests.
+
+## Historical 5.1.2 native-runtime correction
 
 Native SSE completes at a valid `response.completed`/`response.done` with one valid compaction
 item, without waiting for HTTP EOF; later bytes are not interpreted. Premature EOF (including
@@ -37,19 +67,19 @@ not been shown to cancel it. Persistent upstream failures and hard context limit
 ## Install (after the tag exists)
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.2` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.3` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 

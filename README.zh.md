@@ -1,8 +1,33 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.2` 发行版包含已通过真实验收的 `codex-runtime/v1` 恢复修复，配套 `dsh-codex-compaction` `0.3.1`。请使用下列匹配的固定 tag；发布身份与 tag 安装验收记录见 GitHub release。历史 `5.1.0`/`5.1.1` 与 RC tag（`5.1.0-rc.1`、`5.1.0-rc.2`）及旧证据保留。
+`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.3` 发行版修复普通 `codex-runtime/v1` 请求期限，配套 `dsh-codex-compaction` `0.3.2`，并保留历史 `5.1.2`/`0.3.1` 的恢复行为。请使用下列匹配的固定 tag；发布身份与 tag 安装验收记录见 GitHub release。历史 `5.1.0`/`5.1.1` 与 RC tag（`5.1.0-rc.1`、`5.1.0-rc.2`）及旧证据保留。
 
-## 5.1.2 Native runtime 修正
+## 5.1.3 普通生成期限修复
+
+本发布配套 `dsh-codex-compaction` 0.3.2。普通 Native 重放不再受 120 秒生成总上限限制：
+生产 `open()` 的绝对总预算为 **1800 秒**（包含准备时间），模型解析/readiness/认证绑定
+另有 **120 秒准备上限**，绑定成功即撤销准备计时器。配套转换器复用已发布 PiAiAdapter 的
+**300 秒无模型输出超时**，文本、推理与工具参数增量均可重置空闲等待；网络心跳不算模型输出。
+输出不能延长 owner 总期限。绕过配套转换器直接消费 owner 能力的调用只有 owner 期限，
+不会自动获得另一套空闲监控。
+
+显式 Native 压缩仍是 **300 秒总预算**，覆盖全部有限恢复，转换器也保持 300 秒；
+不新增压缩准备阶段的短上限。retry/fallback、创建 provider、切换账户都不能续租。
+取消与首次停止原因保持权威，凭据处理、v1 检查点和历史会话格式不变。
+
+受信任 owner 工厂的 `timeoutMs` 仍表示总预算（默认 30000ms，上限 1800000ms）；
+新增 `setupTimeoutMs`，默认 `min(timeoutMs,120000)`，上限 120000ms；
+`compactionTimeoutMs` 默认 `min(timeoutMs,300000)`，避免普通生成预算隐式扩大压缩。
+普通准备及只读 applicability 采用准备/总预算较小值。公开 `open()` 和模型工具不新增任意超时参数。
+可选 diagnostics 保留 `budgetMs`，新增 `totalBudgetMs`、`setupBudgetMs`、`timeoutBudgetMs`
+和 `timeoutKind: setup|total`，旧 owner 缺失字段保持缺失。owner 到期保留 `CODEX_RUNTIME_TIMEOUT`；
+配套转换器空闲退出使用固定 idle 提示与 `TIMEOUT`，不透传原始 SDK 错误。
+旧 v1 owner/reader 保持读取兼容，但仅更新一方不代表获得完整的新预算保障。
+
+本地测试、不可变发布身份、tag 换装和原实例验收分别记账；契约本身不代表已在当前 GUI 生效。
+有限预算不保证任意模型请求都能完成。
+
+## 历史 5.1.2 Native runtime 修正
 
 Native SSE 在合法 `response.completed`/`response.done` 且存在一个有效压缩项时完成，
 不再等待 HTTP EOF，之后字节不再解释。完成前 EOF（含帧截断）或 socket read 断开为
@@ -30,19 +55,19 @@ comparison 34 + account 266 + paired 17）全绿；最终打包检查与发布 t
 ## 安装（tag 存在后）
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.2` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.3` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 

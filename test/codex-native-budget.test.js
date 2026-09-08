@@ -8,7 +8,7 @@ const options = { configured: () => true, ready: true, resolveOAuth: async () =>
 const context = { messages: [{ role: 'user', content: 'synthetic-budget-input', timestamp: 0 }] };
 const drain = async stream => { for await (const event of stream) {} return stream.result(); };
 
-test('ordinary leases remain 120s while explicit compaction leases get 300s', async t => {
+test('explicit shorter ordinary leases remain 120s while explicit compaction leases get 300s', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const runtime = createCodexRuntime(options);
   try {
@@ -44,7 +44,7 @@ test('starting another native request does not renew the original compaction dea
 
 test('native budget is bounded and caller cannot choose arbitrary lease purpose', async () => {
   for (const compactionTimeoutMs of [0, -1, NaN, Infinity, 300001]) assert.throws(() => createCodexRuntime({ ...options, compactionTimeoutMs }), { code: 'CODEX_RUNTIME_CONFIG' });
-  assert.throws(() => createCodexRuntime({ ...options, timeoutMs: 120001 }), { code: 'CODEX_RUNTIME_CONFIG' });
+  assert.throws(() => createCodexRuntime({ ...options, timeoutMs: 1800001 }), { code: 'CODEX_RUNTIME_CONFIG' });
   const runtime = createCodexRuntime(options);
   try { await assert.rejects(runtime.open({ model: runtime.models()[0].id, purpose: 'unbounded' }), { code: 'CODEX_RUNTIME_PURPOSE' }); }
   finally { runtime.dispose(); }

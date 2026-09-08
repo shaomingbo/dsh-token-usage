@@ -1,4 +1,32 @@
-# Codex owner-bound capability — 5.1.2
+# Codex owner-bound capability
+
+## 5.1.3 request-deadline correction
+
+The 5.1.3 / compaction 0.3.2 pair separates ordinary setup (120000ms), absolute owner total
+(1800000ms), and the paired compaction 0.3.2 converter's published Pi output-idle
+watchdog (300000ms). See README for the exact factory options and diagnostic fields.
+Compaction purpose remains a 300000ms absolute lease without the ordinary short setup
+cap; all retries/fallback share it. No new SSE parser, core patch, login, storage migration
+or checkpoint version is introduced. Updating only an older owner or only the reader
+retains v1 readability but does not supply the complete new budget behavior.
+
+Local regression includes production-sized mock-clock owner/SDK streams and real
+owner/official-basic/Pi replay integration. Final local results, release/tag installation
+and original-host acceptance must be recorded separately; none is inferred from the
+historical 5.1.2 results below.
+
+Local final checks for this pair on Node 24.18.0/macOS arm64: account `npm run check`
+passed 275 tests; companion check passed 138 main + 46 legacy + 34 comparison tests;
+paired check passed 25 tests, including one real-clock 130018ms synthetic tool-argument
+stream through restored official Basic checkpoint replay, pinned SDK and public Pi converter.
+The stream used fake auth and transport, not the upstream service. An independent static
+review reported no substantiated P0/P1/P2. Both pack dry-runs and diff checks passed.
+Temporary-home public installer cycles (first/repeat/status/dump/uninstall/repeat-uninstall)
+and actual installed ESM entry loads passed: account on alpha.3; the pair on rc.1.
+These local-link probes did not boot a server or touch a real profile. Immutable-tag probes,
+publication and current-host acceptance remain separate release/deployment records.
+
+## Historical 5.1.2 baseline
 
 The 5.1.2 release, paired with compaction 0.3.1, carries the live-accepted recovery fix.
 Tag identity, final packaging checks and release-tag installation are recorded separately
