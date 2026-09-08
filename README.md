@@ -1,23 +1,55 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches. The `5.1.0` stable release adds the owner-bound `codex-runtime/v1` capability (see below); the fixed tag is assumed only after the maintainer has actually pushed and verified it, and the historical RC tags (`5.1.0-rc.1`, `5.1.0-rc.2`) are retained.
+`dsh-token-usage` 5.x keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches. The `5.1.2` release carries the live-accepted `codex-runtime/v1` recovery fix, paired with `dsh-codex-compaction` `0.3.1`. Use the matching fixed tags below; publication identity and release-tag installation checks are recorded in the GitHub releases. Historical `5.1.0`/`5.1.1` and RC tags (`5.1.0-rc.1`, `5.1.0-rc.2`) and their evidence are retained.
 
-## Install
+## 5.1.2 native-runtime correction
+
+Native SSE completes at a valid `response.completed`/`response.done` with one valid compaction
+item, without waiting for HTTP EOF; later bytes are not interpreted. Premature EOF (including
+truncated frames) or socket-read failure is recoverable `CODEX_RUNTIME_RESPONSE_STREAM`;
+malformed native responses are non-retryable `CODEX_RUNTIME_RESPONSE_PROTOCOL`.
+The first lease stop cause (TIMEOUT/CANCELLED/CLOSED/DISPOSED) survives subsequent handle use.
+Explicit compaction opens get 300 seconds while ordinary requests stay at 120 seconds. The
+companion's native converter also gets 300 seconds; replay/text converters retain 120 seconds.
+Neither provider creation nor recovery renews the original lease. Optional `diagnostics()`
+returns fixed fields/enums and numeric timings/counts, including `budgetMs` and `eventCounts`,
+never raw event names, content, account identifiers or credentials.
+
+The runtime adds no automatic retries, new login or checkpoint format. The companion owns
+one extra same-lease request: native retry OR allowlisted text fallback, never both; no account
+switch or deadline renewal. Terminal failures suppress new taken-over compaction requests for
+60 seconds per session/provider/model, without pausing ordinary generation. Native-to-text
+fallback is this plugin pair's policy, not an official Codex behavior claim.
+
+An authorized real run used a 300000ms budget, completed in 157372ms with one request and a
+valid item plus completed event, and produced a new official Basic history replacement with
+approximately 146849 tokens shadowed. The maintainer read summary/user-message/end and
+successful command/done from the disk journal. This is evidence for that run, not fsync,
+crash recovery, lossless recall or a cure for every timeout. The maintainer reran the frozen
+production candidate: 498 tests passed (plugin 135 + legacy-A 46 + comparison 34 + account 266 +
+paired 17). Final packaging checks and release-tag installation are separate steps.
+See [the detailed evidence and historical stages](docs/research/codex-runtime-v1.md).
+
+**Known non-blocking limitation:** cancellation may display `CODEX_RUNTIME_ERROR` in the
+compaction status. Refreshing can cancel a pending manual command; tab switching alone has
+not been shown to cancel it. Persistent upstream failures and hard context limits remain.
+
+## Install (after the tag exists)
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.1` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.2` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 
@@ -25,7 +57,7 @@ npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --help
 node bin/install.js --source link:$PWD
 ```
 
-Only the fixed release source or an explicit `link:<local-path>` is accepted; floating sources are rejected.
+Only this installer's own fixed version tag or an explicit `link:<local-path>` is accepted; other version tags and floating sources are rejected. Local source changes require the applicable build and a user-performed restart/refresh; linking alone is not a hot-reload guarantee.
 
 ## Account lifecycle (v5)
 
@@ -77,12 +109,13 @@ npm pack --dry-run --ignore-scripts
 
 `npm run bench:v2` is a development-only analytics benchmark and is not published with the package.
 
-Tests use synthetic data and temporary `DSH_HOME` directories. This release was verified against stock DSH `0.1.2-rc.1` on Node 24.18.0/macOS arm64; lower Node versions were not rerun for the new native capability; the installer refuses other `dsh` CLI versions. Earlier-version compatibility conclusions from previous releases do not carry over to this package, and no broader compatibility is claimed.
+Tests use synthetic data and temporary `DSH_HOME` directories. The native capability's tested composition targets stock DSH `0.1.2-rc.1` on Node 24.18.0/macOS arm64; lower Node versions were not rerun. The installer retains exactly its existing CLI support for `0.1.2-alpha.3` and `0.1.2-rc.1`, rejecting other versions; final-candidate temporary-home install/`--dump-config` checks on both are maintainer release gates. The live acceptance environment had an alpha.3 launcher but actual Web/Basic dependencies at rc.1: this mixed environment is not proof of full native-runtime compatibility on pure alpha.3. The paired compaction package publicly supports rc.1 only; no broader range is claimed.
 
-## Codex native capability (5.1.0 stable)
+## Codex native capability (5.1.2)
 
-This version ships the owner-bound `codex-runtime/v1` capability for the paired
-`dsh-codex-compaction` 0.3.0 stable release: native compaction/replay through the
+This version retains the owner-bound `codex-runtime/v1` capability introduced in 5.1.0
+and adds the recovery correction for the paired `dsh-codex-compaction` 0.3.1 release:
+native compaction/replay through the
 existing ChatGPT connection, with OAuth values kept inside the account owner and
 no second login or credential store. Custom models (e.g. `gpt-6-astra`) resolve
 only through the trusted model-facts seam reading public host-configured profile

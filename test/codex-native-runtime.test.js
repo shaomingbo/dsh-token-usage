@@ -133,6 +133,9 @@ test('close, dispose, caller abort and operation deadline cancel uncooperative I
       if (method === 'abort') controller.abort(new Error(KEY));
       const result = await collect(stream);
       assert.equal(result.message.stopReason, 'aborted'); assert.equal(wireSignal.aborted, true); secretFree(result.events);
+      const code = `CODEX_RUNTIME_${method === 'timeout' ? 'TIMEOUT' : method === 'dispose' ? 'DISPOSED' : method === 'close' ? 'CLOSED' : 'CANCELLED'}`;
+      assert.equal(result.message.errorMessage, code);
+      assert.throws(() => handle.provider({ mode }), { code });
       if (method === 'dispose') await assert.rejects(f.runtime.open({ model: f.model.id }), { code: 'CODEX_RUNTIME_DISPOSED' });
     } finally { f.runtime.dispose(); }
   }
@@ -150,6 +153,32 @@ test('closed handles cannot mint or execute providers and dispose blocks later o
     f.runtime.dispose(); assert.equal(f.runtime.describe().configured, false);
     await assert.rejects(f.runtime.open({ model: f.model.id }), { code: 'CODEX_RUNTIME_DISPOSED' });
   } finally { f.runtime.dispose(); }
+});
+
+test('handle stop reason survives provider/auth reuse and cannot be revived', async () => {
+  for (const method of ['timeout', 'abort', 'close', 'dispose', 'call-abort']) {
+    const f = fixture({ timeoutMs: method === 'timeout' ? 20 : 1000 });
+    const controller = new AbortController();
+    try {
+      const handle = await f.runtime.open({ model: f.model.id, signal: controller.signal });
+      const provider = handle.provider({ mode: 'compact' });
+      if (method === 'timeout') await new Promise(resolve => setTimeout(resolve, 40));
+      if (method === 'abort') controller.abort(new Error(KEY));
+      if (method === 'close') handle.close();
+      if (method === 'dispose') f.runtime.dispose();
+      if (method === 'call-abort') {
+        const call = new AbortController(); call.abort(new Error(KEY));
+        assert.equal((await collect(provider.streamSimple(f.model, context('hello'), { signal: call.signal }))).message.errorMessage, 'CODEX_RUNTIME_CANCELLED');
+      }
+      const code = `CODEX_RUNTIME_${method === 'timeout' ? 'TIMEOUT' : method === 'dispose' ? 'DISPOSED' : method === 'close' ? 'CLOSED' : 'CANCELLED'}`;
+      assert.throws(() => handle.provider(), { code });
+      await assert.rejects(provider.auth.apiKey.resolve(), { code });
+      assert.equal((await collect(provider.streamSimple(f.model, context('hello')))).message.errorMessage, code);
+      handle.close(); f.runtime.dispose();
+      assert.throws(() => handle.provider(), { code }, 'first stop reason is stable');
+      assert.equal(f.calls.length, 0); assert.equal(f.resolves(), 1);
+    } finally { f.runtime.dispose(); }
+  }
 });
 
 test('abort before open and while auth resolves does not create a bound operation', async () => {
@@ -251,7 +280,7 @@ test('failure categories retain numeric HTTP status or phase without raw details
     ...[400, 401, 403, 429, 500].map(status => ({ code: `HTTP_${status}`, fetch: () => new Response(KEY + ' private-cookie', { status }) })),
     { code: 'NETWORK', fetch: () => { throw new TypeError(KEY + ' private-network-detail'); } },
     { code: 'RESPONSE_STREAM', fetch: () => new Response(KEY, { headers: { 'content-type': 'application/json' } }) },
-    { code: 'RESPONSE_STREAM', fetch: () => sse([{ type: 'error', error: { message: KEY } }]) },
+    { code: 'RESPONSE_STREAM', compactCode: 'RESPONSE_PROTOCOL', fetch: () => sse([{ type: 'error', error: { message: KEY } }]) },
   ];
   for (const mode of ['stream', 'compact']) for (const entry of cases) {
     let calls = 0;
@@ -260,7 +289,7 @@ test('failure categories retain numeric HTTP status or phase without raw details
       const handle = await f.runtime.open({ model: f.model.id });
       const result = await collect(handle.provider({ mode }).streamSimple(f.model, context('test')));
       assert.equal(result.message.stopReason, 'error');
-      assert.equal(result.message.errorMessage, `CODEX_RUNTIME_${entry.code}`);
+      assert.equal(result.message.errorMessage, `CODEX_RUNTIME_${mode === 'compact' ? entry.compactCode ?? entry.code : entry.code}`);
       assert.equal(calls, 1, 'diagnosis must not add retries');
       secretFree(result.events);
       assert.doesNotMatch(JSON.stringify(result.events), /private-cookie|private-network-detail/);
@@ -275,6 +304,30 @@ test('failure categories retain numeric HTTP status or phase without raw details
     assert.equal(f.calls.length, 0);
     secretFree(result.events);
   } finally { f.runtime.dispose(); }
+});
+
+test('native distinguishes premature EOF and read disconnect from protocol rejection', async () => {
+  const rows = compactEvents();
+  for (const [reply, code] of [
+    [() => sse(rows.slice(0, 1)), 'RESPONSE_STREAM'],
+    [() => sse([]), 'RESPONSE_STREAM'],
+    [() => new Response(`data: ${JSON.stringify(rows[0])}\n\ndata: {"type":"response.compl`), 'RESPONSE_STREAM'],
+    [() => new Response(`data: ${JSON.stringify(rows[0])}\n\ndata: ${JSON.stringify(rows[1])}\n`), 'RESPONSE_STREAM'],
+    [() => new Response(new ReadableStream({ start(controller) { controller.error(new Error('synthetic socket reset')); } })), 'RESPONSE_STREAM'],
+    [() => new Response('data: {bad}\n\n'), 'RESPONSE_PROTOCOL'],
+    [() => sse(rows.slice(1)), 'RESPONSE_PROTOCOL'],
+    [() => sse([rows[0], rows[0], rows[1]]), 'RESPONSE_PROTOCOL'],
+    [() => sse([rows[0], { type: 'response.completed', response: { status: 'incomplete' } }]), 'RESPONSE_PROTOCOL'],
+  ]) {
+    let calls = 0;
+    const f = fixture({ fetchImpl: async () => { calls++; return reply(); } });
+    try {
+      const handle = await f.runtime.open({ model: f.model.id });
+      const result = await collect(handle.provider({ mode: 'compact' }).streamSimple(f.model, context('hello')));
+      assert.equal(result.message.errorMessage, `CODEX_RUNTIME_${code}`);
+      assert.equal(calls, 1); secretFree(result.events);
+    } finally { f.runtime.dispose(); }
+  }
 });
 
 test('native credential echoes fail rather than corrupting opaque checkpoints', async () => {

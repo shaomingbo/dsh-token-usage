@@ -1,23 +1,48 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.0` 稳定版新增由账户所有者绑定的 `codex-runtime/v1` 能力（见下文）；固定 tag 仅在维护者实际推送并核验后才成立，历史 RC tag（`5.1.0-rc.1`、`5.1.0-rc.2`）保留。
+`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.2` 发行版包含已通过真实验收的 `codex-runtime/v1` 恢复修复，配套 `dsh-codex-compaction` `0.3.1`。请使用下列匹配的固定 tag；发布身份与 tag 安装验收记录见 GitHub release。历史 `5.1.0`/`5.1.1` 与 RC tag（`5.1.0-rc.1`、`5.1.0-rc.2`）及旧证据保留。
 
-## 安装
+## 5.1.2 Native runtime 修正
+
+Native SSE 在合法 `response.completed`/`response.done` 且存在一个有效压缩项时完成，
+不再等待 HTTP EOF，之后字节不再解释。完成前 EOF（含帧截断）或 socket read 断开为
+可恢复的 `CODEX_RUNTIME_RESPONSE_STREAM`；畸形 Native 响应为不可重试的
+`CODEX_RUNTIME_RESPONSE_PROTOCOL`。首次停止原因 TIMEOUT/CANCELLED/CLOSED/DISPOSED
+在后续 handle 调用中保留。显式压缩租约为 300 秒，普通请求仍为 120 秒；配套插件的
+Native 转换器同为 300 秒，重放/文本转换器仍为 120 秒。创建 provider 或恢复都不能续租。
+可选 `diagnostics()` 只返回固定字段/枚举与数字耗时/计数，含 `budgetMs` 和 `eventCounts`，
+不包含原始事件名、内容、账户标识或凭据。
+
+runtime 不增加自动重试、登录或 checkpoint 格式。配套压缩插件持有同租约**一次额外请求**：
+Native retry 或白名单文本 fallback，不能叠加、换账户或重置期限。终止失败后按
+session/provider/model 暂缓新接管压缩请求 60 秒，不暂停普通生成。Native→文本 fallback
+是本插件配对策略，不是 Codex 官方行为声明。
+
+一次获准的真实验收使用 300000ms 预算，耗时 157372ms，一次请求、合法 item + completed，
+官方 Basic 产生新历史替换，约 146849 tokens 被 shadowed。维护者从磁盘 journal 读回
+summary/user-message/end 与 command/done success。这是该次运行的证据，不证明 fsync、
+崩溃恢复、无损回忆或全部超时根治。维护者已复验冻结生产候选，498 项（plugin 135 + legacy-A 46 +
+comparison 34 + account 266 + paired 17）全绿；最终打包检查与发布 tag 换装仍是独立步骤。详见[证据与历史阶段](docs/research/codex-runtime-v1.md)。
+
+**已知非阻断限制：**取消可能在压缩状态中误显示 `CODEX_RUNTIME_ERROR`。刷新可能取消等待中的
+手动命令，尚无证据证明仅切 tab 就取消。持续上游故障与上下文硬限制仍可能导致失败。
+
+## 安装（tag 存在后）
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 status
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 uninstall
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --profile web --source github:shaomingbo/dsh-token-usage#v5.1.0
-npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.2 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.1` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.2` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 
@@ -25,7 +50,7 @@ npx --yes github:shaomingbo/dsh-token-usage#v5.1.1 --help
 node bin/install.js --source link:$PWD
 ```
 
-只接受固定发布源或显式 `link:<本地路径>`；浮动源会被拒绝。
+只接受该安装器自身版本的固定 tag 或显式 `link:<local-path>`；其他版本 tag 与浮动源均被拒绝。本地源码变更需完成适用构建并由用户重启/刷新；仅建立 link 不保证热更新。
 
 ## 账户生命周期（v5）
 
@@ -73,12 +98,12 @@ npm pack --dry-run --ignore-scripts
 
 `npm run bench:v2` 是仅开发用的分析基准，不随包发布。
 
-测试只使用合成数据和临时 `DSH_HOME`。本发布实际验证环境为原装 DSH `0.1.2-rc.1`、Node 24.18.0/macOS arm64；新原生能力尚未在更低 Node 版本重跑；安装器拒绝其他 `dsh` CLI 版本。旧版本的兼容结论不沿用到本包，也不宣称更广兼容性。
+测试只使用合成数据和临时 `DSH_HOME`。原生能力的测试组合以原装 DSH `0.1.2-rc.1`、Node 24.18.0/macOS arm64 为目标，尚未在更低 Node 版本重跑。安装器保留既有 `0.1.2-alpha.3` 与 `0.1.2-rc.1` 两个 CLI 版本支持，拒绝其他版本；最终候选将在二者临时 home 运行安装/`--dump-config` 验证。真实验收现场启动器为 alpha.3，实际 Web/Basic 依赖为 rc.1，不能将此混合现场当作纯 alpha.3 完整原生运行兼容证据。配套压缩包仅公开支持 rc.1，不扩大范围。
 
-## Codex 原生能力（5.1.0 稳定版）
+## Codex 原生能力（5.1.2）
 
-本版本提供由账户所有者绑定的 `codex-runtime/v1` 能力，供配套的
-`dsh-codex-compaction` 0.3.0 稳定版调用：经既有 ChatGPT 连接做原生压缩/重放，
+本版本保留 5.1.0 引入的账户所有者绑定 `codex-runtime/v1` 能力，并加入恢复修正，供配套的
+`dsh-codex-compaction` 0.3.1 调用：经既有 ChatGPT 连接做原生压缩/重放，
 OAuth 值始终留在账户所有者内部，不另造登录或凭据存储。自定义模型（如
 `gpt-6-astra`）只经可信 model-facts 接缝从公开的宿主配置 profile 字段解析；
 缺失或冲突的 metadata 以固定词表缺口报告，绝不编造数值。不能认为已发布的

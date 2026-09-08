@@ -1,6 +1,42 @@
 # Changelog
 
-## 5.1.1
+## 5.1.2
+
+Paired with `dsh-codex-compaction` `0.3.1`; tag identity and release-tag installation
+results are recorded in the GitHub release. The recovery fix's real acceptance evidence
+is distinct from those packaging and installation checks.
+
+- Finish native SSE at valid completed/done plus one compaction item, without waiting for
+  HTTP EOF or interpreting later bytes. Premature EOF (including truncated frames) and
+  socket-read failures are `CODEX_RUNTIME_RESPONSE_STREAM`; malformed protocol remains
+  non-retryable `CODEX_RUNTIME_RESPONSE_PROTOCOL`.
+- Preserve the first TIMEOUT/CANCELLED/CLOSED/DISPOSED lease stop cause on later use.
+  Explicit compaction opens use 300000ms; ordinary opens stay 120000ms. The companion's
+  native converter also uses 300000ms, while replay/text converters stay 120000ms.
+- Optional fixed-field diagnostics report the actual budget, phases, timings, byte/request
+  counts and fixed-enum `eventCounts`; no raw event names, content or credentials.
+  No login, checkpoint version or hidden transport/SDK retry is added.
+- The companion owns one same-lease extra request (native retry OR text fallback, never
+  stacked), with 60-second per-session/provider/model failure suppression. No account switch
+  or deadline renewal. Native-to-text fallback is plugin policy, not an official Codex claim.
+- De-identified real acceptance: 300000ms budget, 157372ms elapsed, one request, valid item
+  plus completed event, official Basic history replacement, approximately 146849 tokens
+  shadowed. The maintainer read summary/user-message/end and successful command/done from
+  the disk journal; no fsync, crash-recovery or universal timeout-fix claim follows.
+- Frozen production candidate rerun: 498 passing tests (plugin 135 + legacy-A 46 +
+  comparison 34 + account 266 + paired 17). Compaction's real rc.1 temporary-home installer
+  cycle also passed without boot. Account temporary-home installer/dump checks on both
+  supported CLI versions remain maintainer release gates.
+- Installer support remains `0.1.2-alpha.3` and `0.1.2-rc.1`, not a wider range; native
+  compaction publicly targets rc.1. The observed alpha.3 launcher with rc.1 Web/Basic
+  dependencies is not a pure-alpha.3 native-runtime acceptance test.
+- Known non-blocking limitation: cancellation may display `CODEX_RUNTIME_ERROR` in the
+  compaction status. Refreshing can cancel a pending manual command; tab switching alone
+  is not established as a cause. Not all timeouts or hard context-limit failures are fixed.
+- README commands target `v5.1.2`; the invalid older-tag `--source` example is replaced by
+  `link:<local-path>`. Only this installer's own fixed version tag or `link:` is accepted.
+
+## 5.1.1 (historical release)
 
 Observation freshness: per-connection quota capabilities, overlay-scoped
 Ollama settings scraping, profile data-dir identity without silent empty
@@ -21,7 +57,7 @@ after the maintainer has actually pushed and verified it; the RC tags
 `dsh-codex-compaction` `0.3.0` stable; see that package's `docs/VALIDATION.md`
 for the de-identified validation facts of this release train.
 
-## 5.1.0-rc.2 (release candidate)
+## 5.1.0-rc.2 (historical release candidate)
 
 - Treat a schema-materialized empty model `input` array as unspecified, matching the public PiAiModelProfile contract; inherit host/catalog modalities instead of rejecting Sol with MODEL_METADATA.
 - Preserve fail-closed validation of illegal nonempty modalities and every existing account/checkpoint binding.
