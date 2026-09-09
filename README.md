@@ -1,8 +1,16 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x keeps the package name and existing local ledger while making the account the single unit of the whole interaction: every configured connection becomes an account automatically, official allowance windows lead the meters, and the local ledger stays a clearly labeled complementary view. No telemetry, prompt storage, or DSH source patches. The `5.1.3` release fixes ordinary `codex-runtime/v1` request deadlines, paired with `dsh-codex-compaction` `0.3.2`, while preserving the historical `5.1.2`/`0.3.1` recovery behavior. Use the matching fixed tags below; publication identity and release-tag installation checks are recorded in the GitHub releases. Historical `5.1.0`/`5.1.1` and RC tags (`5.1.0-rc.1`, `5.1.0-rc.2`) and their evidence are retained.
+`dsh-token-usage` keeps the package name and local ledger. **5.1.4 is an unreleased preparation candidate** combining governance, the Antigravity quota-surface hotfix and the OAuth lifecycle correction. No telemetry, prompt storage, DSH core patches or new data migration. The fixed-tag commands below are for use only after the corresponding tag has actually been published and verified.
 
-## 5.1.3 ordinary-generation deadline correction
+## 5.1.4 candidate scope and evidence
+
+Settings reads local connection facts independently of analytics and quota refresh. Stored raw keys remain configured-unverified. Antigravity quota/catalog reads prefer daily → prod → sandbox; an explicit baseUrl stays pinned, and generation/project discovery are unchanged.
+
+Subscription login supports pending-login and explicit cancellation before or after challenge delivery. Closing a panel does not cancel Host authorization; reopening reattaches the same operation, without late popups or stale UI updates. The input candidate passed **311 account tests**, **27 paired Compaction R2 tests** (one optional real-time test skipped), and authorized **Grok** close/reopen, early/waiting cancel and successful-device-binding checks in an isolated Lab. This is not proof of every provider's OAuth, every failure mode, or a future tag's installation. The tested Compaction R2 is a 0.3.2-versioned source snapshot, not a claim that the published 0.3.2 tag contains its later replay fixes.
+
+The native `codex-runtime/v1` seam, 1800s ordinary / 120s setup / 300s compaction budgets, SDK pins and data identity are unchanged. This preparation additionally clears the local card when a reattached login finishes failed/cancelled, with two offline regressions; these terminal cases were not repeated against a real provider. Apart from that local UI cleanup, runtime code is preserved from the tested input; release version/documentation are a separate delta. Final commit/tag, artifact and production acceptance remain pending.
+
+## Historical 5.1.3 ordinary-generation deadline correction
 
 Pair this release with `dsh-codex-compaction` 0.3.2. Ordinary native replay no longer
 uses a 120-second total generation cap: production `open()` has an absolute **1800-second**
@@ -67,19 +75,19 @@ not been shown to cancel it. Persistent upstream failures and hard context limit
 ## Install (after the tag exists)
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.3` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.4` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 
@@ -98,6 +106,22 @@ The interaction is one journey: sidebar entry → dock → overview → per-acco
 - **Simple configuration:** a host-side product-template catalog (`lib/accounts/templates.json`, seeded into `provider_templates`) pre-fills windows, exact values (GLM plan credits, Aliyun request caps, Gemini daily requests) and provider aliases. The wizard suggests accounts from observed ledger traffic; an advanced form still covers custom quotas, prices, balances and rules.
 - **Honest local half:** each account's DSH-observed usage (equivalent $, new-compute tokens, requests, model table, 30-day trend) with average-rate extrapolation explicitly labeled as arithmetic, never as a forecast.
 - **Deprecated:** the v5 billing-pool form is retired from the UI. `plans`/`plan_rules` remain readable and keep working through the lossless projection; `save-plan` RPCs stay available but report `deprecated`.
+
+### Unreleased candidate work (P1-B / P1-C + governance round 2)
+
+> These governance changes are included in the **unreleased 5.1.4 preparation candidate**, together with the Antigravity hotfix and the later OAuth correction. They are **not** part of the published `v5.1.3` tag (`dddb7f2b`). The commands above target the future 5.1.4 tag, not an already verified release. Existing native-runtime code and budgets remain unchanged; version metadata and documentation are updated separately. `ACCOUNT-R2-REPORT.md` and `ACCOUNT-R3-REPORT.md` retain historical working-tree evidence only (not packaged); neither alone establishes the latest OAuth or release gate.
+
+### Lifecycle ownership (P1-B)
+
+Account authorization state, provider/model capabilities, and the `codex-runtime/v1` native capability are owned by the account lifecycle; the analytics usage store is a separate lifecycle scope inside the same package. Analytics mount, failure, stop, and cleanup never unregister capabilities, never cancel in-flight native runs, and never rewrite account rows; only the Host dispose of this bundle ends both scopes (canceling native leases, closing the store, releasing capability owners, in that order). Account facts remain visible while analytics is degraded: the `/account-usage` `connections` endpoint is strictly read-only — local connection status, cached model catalogs, adapter and proxy state — and never touches the usage store, creates accounts, or starts a quota network refresh. `summary` keeps its overlay duties (zero-config account pass plus the observation-cadence anchor). The provided `accountUsage` service exposes only `list`/`observe`/`observations`; no RPC or service method may stop either lifecycle, and unmounting the analytics UI ends neither. See `ACCOUNT-R2-REPORT.md` in the repository root for the working-tree evidence (not part of the published package).
+
+### Accounts & Models settings section (P1-C, unreleased candidate)
+
+A native `settings.section` slot entry ("Accounts & Models") surfaces provider connections outside the analytics overlay. Its only automatic data source is the read-only `connections` RPC: local connection facts, cached model catalogs and proxy state — it never loads the usage statistics channel, never mounts the dashboard, and never triggers a quota refresh, model sync or login by itself. Refreshing the facts is an explicit action. Expanding a connection opens the same `ConnectionSection` controls used by the account insight, but in facts mode (C-001 fix): the expanded panel reads and reloads the very same read-only `connections` payload as the list, so expanding, switching or refreshing a row — and every explicit sign-in, credential or model-sync action — never calls the analytics `summary`, creates accounts or starts an observation, and the management controls stay fully usable even when the statistics store is broken. No second OAuth, key or model-sync implementation exists; the account insight keeps its own summary-based strategy. Connections are keyed by stable `providerId` + `connectionId`; stored API keys or quota cookies read as "Configured · no official check", never as a verified connection. Closing the page or switching views stops the local device-login wait without canceling the host authorization; the explicit cancel button remains the only path that cancels it, and reopening reattaches through the non-destructive pending-login query. See `ACCOUNT-R2-REPORT.md` in the repository root (not part of the published package).
+
+### Governance round 3 integration + Antigravity quota hotfix (unreleased candidate)
+
+This tree integrates the governance round-2 candidate above on top of the Antigravity allowance-read hotfix (commit `44125a55`: `lib/capabilities/antigravity/antigravity-api.js` and `lib/capabilities/antigravity/usage.js` answer quota/catalog reads from the daily→prod→sandbox surfaces, with a new `test/antigravity-quota.test.js`; generation and project discovery are unchanged). Neither the round-2 candidate nor this hotfix is part of the published `v5.1.3` tag. Integration evidence and 5.1.3-preservation checks: see `ACCOUNT-R3-REPORT.md` in the repository root (not part of the published package).
 
 ## Product model
 

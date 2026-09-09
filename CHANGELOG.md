@@ -1,5 +1,28 @@
 # Changelog
 
+## 5.1.4 (unreleased preparation)
+
+- Combine the governance candidate, Antigravity quota-surface hotfix and the verified
+  OAuth lifecycle correction. This is a new local candidate, not the published v5.1.3 tag.
+- Keep Settings connection facts independent of the analytics store and quota refresh;
+  stored raw keys remain configured-unverified, never falsely Connected.
+- Read Antigravity quota/catalog from daily, then prod, then sandbox; explicit baseUrl
+  remains pinned. Generation and project discovery retain their existing paths.
+- Expose the active subscription login through pending-login and support explicit
+  provider cancellation before a challenge arrives. Closing a panel stops its local
+  effects without cancelling Host authorization; reopening reattaches the same operation.
+- Clear the local card and re-enable Connect when a reattached login reaches failed
+  or cancelled, retaining its reason and adding no Host cancel/logout request. Two
+  offline regressions cover these terminal states; no new real-provider claim follows.
+- Preserve codex-runtime/v1, the 1800s ordinary / 120s setup / 300s compaction budgets,
+  the two pinned SDK versions and existing data identity. No data migration is added.
+- The pre-terminal-fix input passed 311 account tests and a paired Compaction R2
+  suite (27 pass, one optional real-time test skipped). An explicitly authorized Grok
+  test account passed close/reopen, cancellation before/after challenge, and final binding.
+  These are candidate-specific checks, not other-provider OAuth or formal-tag acceptance.
+- Commit/tag publication, final artifact installation and production activation remain
+  separate gates. The 5.1.4 version number does not assert a published or reserved tag.
+
 ## 5.1.3
 
 - Pair with compaction 0.3.2: ordinary production leases use 1800000ms absolute total,
