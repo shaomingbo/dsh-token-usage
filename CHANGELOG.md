@@ -1,5 +1,71 @@
 # Changelog
 
+## 5.1.6 (unreleased candidate)
+
+- Rebuild the settings provider-connections section as master-detail (B-form):
+  one list entry per source — the Antigravity account pool collapses into a
+  single entry with a pool summary — and a detail pane that reuses the shared
+  connection controls on the already-loaded read-only facts (C-001 preserved).
+  The cached model catalog rides with the Ollama Cloud detail; the standalone
+  catalog card is gone. Ollama Local has no account surface and stays out.
+- Add the Antigravity account pool UI: active/standby roles with per-account
+  activate/remove, add-account sign-in, an auto-failover toggle over the
+  existing set-auto-failover capability, and an entry that survives an emptied
+  pool so the add flow stays reachable. An expired ACCESS token keeps the
+  activation action (the runtime refreshes through the stored refresh token).
+- Keep the sidebar footer and dock rows on one window choice (watched first,
+  else tightest): entry-summary pools carry their official windows, and the
+  footer meters a whole window instead of mixing fields across windows.
+- Route credential writes through the host api-remotes credentials namespace —
+  the contract the host's own models page uses — instead of the nonexistent
+  connection.api facade; declare remote/remote.credentials in the client inject.
+- Recover a pending host-side Antigravity authorization after a remount:
+  expose auth.pendingLogin() and a pending-login capability endpoint; the pool
+  detail reattaches once per mount and never starts a new authorization.
+- Timing ownership for pool login operations: every start/cancel bumps an
+  operation generation, so a late reattach response cannot take over a newer
+  login and an abandoned poll cannot unlock a cancel still in flight.
+- Tests: 330 passing, including empty-pool reachability, cancel-then-retry,
+  reopen reattach, expired-standby activation and footer window phases. No
+  new real-provider claim; no data migration; no core changes.
+- Supersedes v5.1.5 in-tree: the OAuth lifecycle and SDK stream diagnostics
+  corrections (72ecf169, 8527a00) are included; the tree is a strict content
+  superset of the v5.1.5 tag.
+
+## 5.1.5 (unreleased candidate)
+
+- Preserve published v5.1.4 (`72ecf169`) as the base; no rollback of its OAuth/UI fixes.
+- Correct SDK stream diagnostic termination before freeze: completed, failed, cancelled,
+  timed-out. Preserve original error identities, lease concurrency, deadlines and usage.
+- Omit unavailable SDK-owned body/event counters rather than manufacturing zero or
+  counting normalized events as wire data. Native transport diagnostics are unchanged.
+- Add fake transport/pinned SDK regressions and pair with compaction 0.4.0's optional
+  terminal-phase allowlist. No new real-provider test is claimed for this diagnostic delta.
+- No core, authentication, data migration, publication or production activation changes.
+
+## 5.1.4 (unreleased preparation)
+
+- Combine the governance candidate, Antigravity quota-surface hotfix and the verified
+  OAuth lifecycle correction. This is a new local candidate, not the published v5.1.3 tag.
+- Keep Settings connection facts independent of the analytics store and quota refresh;
+  stored raw keys remain configured-unverified, never falsely Connected.
+- Read Antigravity quota/catalog from daily, then prod, then sandbox; explicit baseUrl
+  remains pinned. Generation and project discovery retain their existing paths.
+- Expose the active subscription login through pending-login and support explicit
+  provider cancellation before a challenge arrives. Closing a panel stops its local
+  effects without cancelling Host authorization; reopening reattaches the same operation.
+- Clear the local card and re-enable Connect when a reattached login reaches failed
+  or cancelled, retaining its reason and adding no Host cancel/logout request. Two
+  offline regressions cover these terminal states; no new real-provider claim follows.
+- Preserve codex-runtime/v1, the 1800s ordinary / 120s setup / 300s compaction budgets,
+  the two pinned SDK versions and existing data identity. No data migration is added.
+- The pre-terminal-fix input passed 311 account tests and a paired Compaction R2
+  suite (27 pass, one optional real-time test skipped). An explicitly authorized Grok
+  test account passed close/reopen, cancellation before/after challenge, and final binding.
+  These are candidate-specific checks, not other-provider OAuth or formal-tag acceptance.
+- Commit/tag publication, final artifact installation and production activation remain
+  separate gates. The 5.1.4 version number does not assert a published or reserved tag.
+
 ## 5.1.3
 
 - Pair with compaction 0.3.2: ordinary production leases use 1800000ms absolute total,

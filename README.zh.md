@@ -1,8 +1,27 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 5.x 保留原包名和本地用量账本，并新增统一的提供方账号连接与官方用量观察。无遥测、不保存提示词、不修改 DSH 源码。`5.1.3` 发行版修复普通 `codex-runtime/v1` 请求期限，配套 `dsh-codex-compaction` `0.3.2`，并保留历史 `5.1.2`/`0.3.1` 的恢复行为。请使用下列匹配的固定 tag；发布身份与 tag 安装验收记录见 GitHub release。历史 `5.1.0`/`5.1.1` 与 RC tag（`5.1.0-rc.1`、`5.1.0-rc.2`）及旧证据保留。
+## 5.1.6 账户面板重构（未发布候选）
 
-## 5.1.3 普通生成期限修复
+设置页「提供方连接与模型来源」改为主从双栏：每个来源一项（Antigravity 账户池合并为单项，池内管理轮转——设为当前/移除/添加账户/自动轮转开关），详情复用既有的连接控件且只读事实（C-001 保持）。缓存模型目录随 Ollama Cloud 详情展示；Ollama Local 无账户面，不再出现在面板中。凭据写入走宿主 api-remotes 凭据命名空间（与宿主 Models 页同一契约）。关闭弹窗后未完成的 Antigravity 授权可在池详情重挂恢复。侧栏底部与 dock 行使用同一窗口选择规则（★ 窗口优先，否则最紧窗）。330 个测试通过；无新增真实提供方验收；树内容为 v5.1.5 tag 的严格超集。
+
+
+`dsh-token-usage` **5.1.5 是未发布候选**，基于已经存在的 v5.1.4 固定提交 `72ecf169b15a64c6c52a0b83c73c4998d63052fc`，保留治理/OAuth 修复，仅增加 native owner 的 stream 诊断修正。不新增认证、数据迁移、core 补丁或真实提供方调用。下方固定 tag 命令仅在实际发布并验收后使用。
+
+## 5.1.5 SDK stream 诊断
+
+配合 compaction 0.4.0，诊断可选终态为 completed、failed、cancelled、timed-out，先记终态再冻结租约；不改变错误身份、取消、期限或 usage。SDK 内部读取的 wire bytes/events 不可观测，明确缺省，绝不从标准化事件伪造计数。Native compact 原计数不变。旧 consumer 遇到新终态可能不显示整份诊断，但不影响执行。假 transport、锁定 SDK 0.84.4 与隔离配对验证，不等同新增真实模型验收。
+
+## 历史 5.1.4 准备范围与证据
+
+以下为当时准备阶段的历史说明；v5.1.4 现已存在，不代表本次新候选已发布或激活生产。
+
+设置页独立读取本地连接事实，不依赖统计库或触发额度刷新；已存原始 key 仍标为已配置但未校验。Antigravity 额度/目录读取优先 daily → prod → sandbox；显式 baseUrl 仍钉死，生成与项目发现路径不变。
+
+订阅登录新增 pending-login 与 challenge 返回前/后的显式取消。关闭面板不取消宿主授权，重新展开重挂同一操作，不产生迟到弹窗或过期 UI 更新。修复终态前的输入候选已通过 **311 项账户测试**、**27 项压缩 R2 配对测试**（1 项可选实时时钟测试跳过），以及隔离 Lab 内明确授权的 **Grok** 关闭/重挂、早期/等待中取消及最终设备绑定。这不证明所有提供方 OAuth、所有失败模式或未来 tag 的安装。受测压缩 R2 是版本字段为 0.3.2 的源码快照，不代表已发布 0.3.2 tag 包含其后续回放修复。
+
+`codex-runtime/v1` 接缝、普通1800秒/准备120秒/压缩300秒预算、SDK 钉住版本与数据身份不变。本准备候选另修复重挂登录failed/cancelled后卡片与禁用状态的清理，并补两项离线回归；未对这两种终态重复真实提供方验收。除此局部UI清理外，运行时保全自已测试输入，发布版本/文档另记差量；最终 commit/tag、artifact 与生产验收仍待完成。
+
+## 历史 5.1.3 普通生成期限修复
 
 本发布配套 `dsh-codex-compaction` 0.3.2。普通 Native 重放不再受 120 秒生成总上限限制：
 生产 `open()` 的绝对总预算为 **1800 秒**（包含准备时间），模型解析/readiness/认证绑定
@@ -55,19 +74,19 @@ comparison 34 + account 266 + paired 17）全绿；最终打包检查与发布 t
 ## 安装（tag 存在后）
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.3 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.3` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.5` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 
@@ -86,6 +105,22 @@ node bin/install.js --source link:$PWD
 - **简单配置：** host 侧产品模板目录（`lib/accounts/templates.json`，启动时 seed 进 `provider_templates`）预填窗口、精确值（GLM 套餐积分、阿里云请求上限、Gemini 每日请求数）和 provider 别名；向导根据账本实测流量给建账户建议；高级表单仍支持自定义额度、价格、余额与规则。
 - **诚实的本地半边：** 每个账户的 DSH 观察用量（等值 $、新计算 token、请求数、模型表、30 天趋势），外推明确标注为算术平均速率而非预测。
 - **弃用：** v5 计费池表单从 UI 退役。`plans`/`plan_rules` 仍可读并经无损投影继续生效；`save-plan` RPC 保留但返回 `deprecated`。
+
+### 未发布候选说明（P1-B / P1-C + 治理第二轮）
+
+> 以下治理增量与 Antigravity 热修复、后续 OAuth 修复一起纳入 **未发布的5.1.4准备候选**；它们 **不属于** 已发布的 `v5.1.3` tag（`dddb7f2b`）。上方命令面向未来5.1.4 tag，不代表已核验的发布。原生运行时代码与预算保持不变，版本元数据和文档另作更新。`ACCOUNT-R2-REPORT.md`、`ACCOUNT-R3-REPORT.md` 仅保留历史工作树证据（不随包分发），不能单独证明最新 OAuth 或发布门禁。
+
+### 生命周期所有权（P1-B）
+
+账户授权状态、provider/模型能力和 `codex-runtime/v1` 原生能力由账户生命周期拥有；分析统计的用量存储是同一包内独立的生命周期域。分析统计的挂载、失败、停止与清理不会注销能力、不会取消在途原生运行、也不会改写账户数据；只有本 bundle 的 Host dispose 才按固定顺序同时结束两个域（先取消原生租约、再关闭用量存储、最后释放能力所有者）。统计降级时账户事实仍可见：`/account-usage` 的 `connections` 端点严格只读——仅本地连接状态、缓存的模型目录、adapter 与代理状态——不触碰用量存储、不创建账户、不触发额度网络刷新。`summary` 保留其 overlay 职责（零配置账户引导与观察节奏锚点）。对外提供的 `accountUsage` 服务只暴露 `list`/`observe`/`observations`；任何 RPC 或服务方法都不能停止任一生命周期，卸载统计 UI 也不结束任一生命周期。工作区证据见仓库根目录 `ACCOUNT-R2-REPORT.md`（不随包发布）。
+
+### 「账户与模型」原生设置入口（P1-C，未发布候选）
+
+通过原生 `settings.section` slot 新增「账户与模型」设置入口，把提供方连接带到分析 overlay 之外。它唯一的自动数据源是只读 `connections` RPC：本地连接事实、缓存模型目录与代理状态——不加载统计通道、不挂载 Dashboard、不会自行触发额度刷新/模型同步/登录；刷新连接事实是显式操作。展开某个连接会打开与洞察页相同的 `ConnectionSection` 控件，但在事实模式下运行（C-001 修复）：展开面板读取并重载与列表相同的只读 `connections` 载荷，因此展开、切换、刷新某个连接——以及每次显式登录、凭据保存、模型同步动作——都不会调用分析 `summary`、不创建账户、不启动观察轮，且统计库损坏时管理控件仍然完全可用。不另造第二套 OAuth、key 或模型同步实现；洞察页保留其基于 summary 的旧策略。连接以稳定的 `providerId` + `connectionId` 区分；已存储的 API key 或额度 Cookie 显示为「已配置 · 官方无校验」（AC-001），绝不显示为已验证连接。关闭页面或切换视图会停止本地设备授权等待，但不会取消宿主侧授权；显式「取消登录」按钮仍是唯一取消路径，重新打开时经非破坏性的 pending-login 查询重挂。证据见仓库根目录 `ACCOUNT-R2-REPORT.md`（不随包发布）。
+
+### 治理第三轮整合 + Antigravity 额度热修复（未发布候选）
+
+本工作树把上一节的治理第二轮候选整合到 Antigravity 额度读取热修复（提交 `44125a55`：`lib/capabilities/antigravity/antigravity-api.js` 与 `lib/capabilities/antigravity/usage.js` 的额度/目录读取改为应答 daily→prod→sandbox 面，并新增 `test/antigravity-quota.test.js`；生成与项目发现不变）之上。第二轮候选与该热修复均不属于已发布的 `v5.1.3` tag。整合证据与 5.1.3 保全核验见仓库根目录 `ACCOUNT-R3-REPORT.md`（不随包发布）。
 
 ## 产品模型
 

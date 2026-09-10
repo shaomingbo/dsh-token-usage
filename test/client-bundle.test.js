@@ -43,10 +43,10 @@ test('client ships the module-loader factory bundle shape', () => {
   assert.match(source, /factory: \(require\) =>/)
 })
 
-test('client injects only slots and connection', () => {
+test('client injects slots, connection and the remote credentials namespace', () => {
   const { bundle, require } = loadClientHarness()
   const module = bundle.factory(require)
-  assert.deepEqual([...module.inject].sort(), ['connection', 'slots'])
+  assert.deepEqual([...module.inject].sort(), ['connection', 'remote', 'remote.credentials', 'slots'])
 })
 
 test('apply registers the sidebar action and the full-frame overlay', () => {
@@ -55,15 +55,25 @@ test('apply registers the sidebar action and the full-frame overlay', () => {
   const names = injected.map((entry) => entry.name)
   assert.ok(names.includes('sidebar.footer.action'), 'sidebar footer action missing')
   assert.ok(names.includes('shell.overlay'), 'shell overlay missing')
+  assert.ok(names.includes('settings.section'), 'Accounts & Models settings section missing')
   // Drive each registration to prove the components exist.
   for (const entry of injected) entry.register()
-  assert.ok(registrations.length >= 2)
+  assert.ok(registrations.length >= 3)
   for (const { definition, component } of registrations) {
-    assert.ok(['sidebar.footer.action', 'shell.overlay'].includes(definition.name))
+    assert.ok(['sidebar.footer.action', 'shell.overlay', 'settings.section'].includes(definition.name))
     assert.equal(typeof component, 'function')
   }
   const overlay = registrations.find(({ definition }) => definition.name === 'shell.overlay')
   assert.ok(overlay.definition.id.startsWith('dsh-token-usage'))
+  // The settings section keeps the slot shape proven by the installed
+  // dsh-attention plugin: stable id, label and the runtime inject share.
+  const settings = registrations.find(({ definition }) => definition.name === 'settings.section')
+  assert.equal(settings.definition.id, 'accounts-models')
+  assert.equal(typeof settings.definition.label, 'function')
+  assert.match(String(settings.definition.label()), /Accounts & Models|账户与模型/)
+  assert.equal(typeof settings.definition.inject, 'function')
+  const share = settings.definition.inject()
+  assert.deepEqual([...Object.keys(share).sort()], ['connection', 'locale', 'store'])
 })
 
 test('client carries both locale dictionaries', () => {
@@ -215,7 +225,12 @@ test('v5 components render against a mocked host without throwing', async () => 
           return { ok: true, value }
         },
       },
-      api: { credentials: { set: async () => ({ ok: true }) } },
+    },
+    remote: {
+      credentials: {
+        set: async () => ({ ok: true }),
+        describe: async (refs) => ({ ok: true, value: Object.fromEntries((refs ?? []).map((ref) => [ref, { configured: true }])) }),
+      },
     },
     locale: undefined,
     effect: (fn) => fn(),
@@ -229,7 +244,7 @@ test('v5 components render against a mocked host without throwing', async () => 
   const window = { __ModuleLoader__: { load: (loaded) => { bundle = loaded } } }
   new Function('window', 'require', source)(window, require)
   const module = bundle.factory(require)
-  assert.deepEqual([...module.inject].sort(), ['connection', 'slots'])
+  assert.deepEqual([...module.inject].sort(), ['connection', 'remote', 'remote.credentials', 'slots'])
   module.apply(ctx)
   assert.ok(registrations.length >= 2)
   const t = (key) => key
@@ -296,12 +311,333 @@ test('v5 components render against a mocked host without throwing', async () => 
   await new Promise((resolvePromise) => { setTimeout(resolvePromise, 30) })
 })
 
-test('credential writes mirror the DSH Web high-level facade contract', () => {
-  assert.match(source, /credentials\.set\(\{ ref, value \}\)/)
-  assert.match(source, /credentials\.describe\(\{ refs: \[ref\] \}\)/)
-  assert.match(source, /response\?\.result\?\.ok/)
-  assert.match(source, /describe\.result\.value\.credentials/)
-  assert.ok(!source.includes('credentialRequest('), 'the facade must not receive a nested RpcRequest')
+test('sidebar footer meters the watched window the dock row stars', async () => {
+  // GLM observed two windows: the 5h rolling one (26%) and an MCP billing
+  // window (100%) — the tightest. The dock row stars the 5h window; the
+  // footer must meter the same starred window, not the server-side fullest
+  // pick, or the two surfaces disagree (26% vs 100% for one account).
+  const React = {
+    createElement: (type, props, ...children) => ({ type, props, children }),
+    useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
+    useEffect: () => {},
+    useCallback: (fn) => fn,
+    useMemo: (fn) => fn(),
+    useRef: (initial) => ({ current: initial }),
+  }
+  const responses = new Map([
+    ['/token-usage:entry-summary', { configured: true, month: {}, tightest: null, pools: [] }],
+  ])
+  const registrations = []
+  const ctx = {
+    slots: {
+      inject: (name, register) => register(),
+      register: (definition, component) => { registrations.push({ definition, component }); return () => {} },
+    },
+    connection: {
+      rpc: { call: async (channel, endpoint) => {
+        const value = responses.get(`${channel}:${endpoint}`)
+        if (value === undefined) return { ok: false, error: { code: 'missing', message: `unmapped ${channel}:${endpoint}` } }
+        return { ok: true, value }
+      } },
+    },
+    remote: {
+      credentials: {
+        set: async () => ({ ok: true }),
+        describe: async (refs) => ({ ok: true, value: Object.fromEntries((refs ?? []).map((ref) => [ref, { configured: true }])) }),
+      },
+    },
+    locale: undefined,
+    effect: (fn) => fn(),
+  }
+  const require = (name) => {
+    if (name === 'react') return React
+    throw new Error(`unexpected client dependency: ${name}`)
+  }
+  let bundle
+  const window = { __ModuleLoader__: { load: (loaded) => { bundle = loaded } } }
+  new Function('window', 'require', source)(window, require)
+  const module = bundle.factory(require)
+  module.apply(ctx)
+  const entry = registrations.find(({ definition }) => definition.name === 'sidebar.footer.action')
+  const overlayForStore = registrations.find(({ definition }) => definition.name === 'shell.overlay')
+  const sharedStore = overlayForStore.component({}).props.store
+
+  const now = Date.now()
+  sharedStore.update({
+    entrySummary: {
+      configured: true,
+      month: { elapsedPct: 32, daysLeft: 20, resetLabel: '2026-09-30' },
+      tightest: { id: 'connection:glm:default', name: 'GLM / Z.AI', color: '#e5a23c', usedPct: 100, sourceKind: 'official_client_api', windowLabel: 'MCP', resetsAt: now + 19 * 86_400_000, ageMs: 60_000, brittle: true },
+      pools: [{
+        id: 'connection:glm:default', name: 'GLM / Z.AI', color: '#e5a23c', kind: 'subscription',
+        usedPct: 100,
+        window: { label: 'MCP', resetsAt: now + 19 * 86_400_000, usedPct: 100, sourceKind: 'official_client_api', ageMs: 60_000 },
+        official: { observedAt: now - 60_000, sourceKind: 'official_client_api', brittle: true, windows: [
+          { id: 'glm-window:5', label: '5小时', percentUsed: 26, resetsAt: now + 4 * 3_600_000 },
+          { id: 'glm-window:mcp', label: 'MCP', percentUsed: 100, resetsAt: now + 19 * 86_400_000, ageMs: 60_000 },
+        ] },
+      }],
+      unassigned: null,
+      tightestPoolId: 'connection:glm:default',
+    },
+  })
+  const backing = new Map([['tu3.watchedWindows', JSON.stringify({ 'connection:glm:default': 'glm-window:5' })]])
+  globalThis.localStorage = {
+    getItem: (key) => (backing.has(key) ? backing.get(key) : null),
+    setItem: (key, value) => { backing.set(key, value) },
+    removeItem: (key) => { backing.delete(key) },
+  }
+  const buildSummary = (fiveHourPct, fiveHourReset) => ({
+    configured: true,
+    month: { elapsedPct: 32, daysLeft: 20, resetLabel: '2026-09-30' },
+    tightest: { id: 'connection:glm:default', name: 'GLM / Z.AI', color: '#e5a23c', usedPct: 100, sourceKind: 'official_client_api', windowLabel: 'MCP', resetsAt: now + 19 * 86_400_000, ageMs: 60_000, brittle: true },
+    pools: [{
+      id: 'connection:glm:default', name: 'GLM / Z.AI', color: '#e5a23c', kind: 'subscription',
+      usedPct: 100,
+      window: { label: 'MCP', resetsAt: now + 19 * 86_400_000, usedPct: 100, sourceKind: 'official_client_api', ageMs: 60_000 },
+      official: { observedAt: now - 60_000, sourceKind: 'official_client_api', brittle: true, windows: [
+        { id: 'glm-window:5', label: '5小时', percentUsed: fiveHourPct, resetsAt: fiveHourReset },
+        { id: 'glm-window:mcp', label: 'MCP', percentUsed: 100, resetsAt: now + 19 * 86_400_000, ageMs: 60_000 },
+      ] },
+    }],
+    unassigned: null,
+    tightestPoolId: 'connection:glm:default',
+  })
+  sharedStore.update({ entrySummary: buildSummary(26, now + 4 * 3_600_000) })
+  try {
+    const meterJson = () => JSON.stringify(entry.component({ wide: true }).type(entry.component({ wide: true }).props))
+    // Phase 1: the starred 5h window meters (26%), the MCP window does not.
+    let json = meterJson()
+    assert.ok(json.includes('26%') && json.includes('5小时'), 'the starred 5h window meters the footer')
+    assert.ok(!json.includes('MCP'), 'the unwatched MCP window must not meter the footer (the global tightest line keeps its own 100%)')
+    // Phase 2: watching the MCP window meters it — watched wins, no silent
+    // fallback to the tightest window.
+    backing.set('tu3.watchedWindows', JSON.stringify({ 'connection:glm:default': 'glm-window:mcp' }))
+    json = meterJson()
+    assert.ok(json.includes('MCP') && json.includes('100%'), 'watching the MCP window meters it, watched wins')
+    assert.ok(!json.includes('5小时'), 'the unstarred window must not bleed into the meter')
+    // Phase 3: the starred window with unknown percentage and reset keeps its
+    // own nulls — it must not borrow the MCP window's 100% or its countdown.
+    sharedStore.update({ entrySummary: buildSummary(null, null) })
+    backing.set('tu3.watchedWindows', JSON.stringify({ 'connection:glm:default': 'glm-window:5' }))
+    json = meterJson()
+    assert.ok(!json.includes('MCP'), 'the unknown starred window must not borrow the MCP values')
+    assert.ok(!json.includes('重置还需'), 'an unknown reset must not borrow the other window\'s countdown')
+    // The pre-existing caption renders the no-level placeholder instead of a
+    // percentage when the metered window's level is unknown.
+    assert.ok(json.includes('No declared local usage') || json.includes('—'), 'the unknown level renders as the no-quota placeholder')
+  } finally {
+    delete globalThis.localStorage
+  }
+})
+
+test('settings section: an emptied account pool keeps the add-account flow reachable', async () => {
+  const harness = createSettingsHarness({
+    connections: {
+      adapters: [],
+      connections: [
+        { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: true, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+        { providerId: 'ollama-local', displayName: 'Ollama Local', configured: false, quotaApplicable: false, observationSource: 'none' },
+      ],
+      modelCatalogs: [],
+      antigravity: { activeAccountId: null, autoFailover: true, accounts: [] },
+      privacy: {},
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const tree = runtime.render(settingsComponent, {})
+    assert.ok(findButtons(tree, 'Antigravity').length === 1, 'the pool entry renders even with zero accounts')
+    findButtons(tree, 'Antigravity')[0].props.onClick()
+    await flushMicrotasks()
+    const detail = runtime.render(settingsComponent, {})
+    assert.equal(findButtons(detail, '＋ Add account').length, 1, 'the add-account flow stays reachable from an empty pool')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('pool login: cancel then immediate retry keeps the new wait alive', async () => {
+  let loginCounter = 0
+  const harness = createSettingsHarness({
+    connections: settingsConnectionsPayload(),
+    extraResponses: {
+      '/account-usage:connection-action': (payload) => {
+        if (payload?.action === 'pending-login') return { login: null, active: false }
+        if (payload?.action === 'start-login') {
+          loginCounter += 1
+          return { challenge: { loginId: `L${loginCounter}`, authUrl: 'https://example.com/agg' } }
+        }
+        if (payload?.action === 'login-status') return { status: { kind: 'pending' } }
+        if (payload?.action === 'cancel-login') return {}
+        return {}
+      },
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    findButtons(runtime.render(settingsComponent, {}), 'Antigravity')[0].props.onClick()
+    await flushMicrotasks()
+    const add = () => findButtons(runtime.render(settingsComponent, {}), '＋ Add account')[0]
+    add().props.onClick()
+    await flushMicrotasks()
+    assert.equal(loginCounter, 1, 'the first login started')
+    findButtons(runtime.render(settingsComponent, {}), 'Cancel sign-in')[0].props.onClick()
+    await flushMicrotasks()
+    assert.ok(!JSON.stringify(runtime.render(settingsComponent, {})).includes('Cancel sign-in'), 'the first card closed')
+    // Immediate retry: the abandoned loop must not retire the NEW wait.
+    add().props.onClick()
+    await flushMicrotasks()
+    assert.equal(loginCounter, 2, 'the retry started a second login')
+    await harness.clock.advance()
+    assert.ok(countAction(harness, 'login-status') >= 1, 'the new wait polls the host status')
+    runtime.unmountAll()
+    await harness.clock.advance()
+    const pollsBefore = countAction(harness, 'login-status')
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), pollsBefore, 'no orphaned loop survives the unmount')
+  } finally {
+    restore()
+  }
+})
+
+test('pool login: reopening the dialog reattaches to the pending authorization', async () => {
+  const harness = createSettingsHarness({
+    connections: settingsConnectionsPayload(),
+    extraResponses: {
+      '/account-usage:connection-action': (payload) => {
+        if (payload?.action === 'pending-login') return { login: { loginId: 'P9', authUrl: 'https://example.com/agg' }, active: true }
+        if (payload?.action === 'login-status') return { status: { kind: 'pending' } }
+        if (payload?.action === 'cancel-login') return {}
+        return {}
+      },
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    findButtons(runtime.render(settingsComponent, {}), 'Antigravity')[0].props.onClick()
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const json = JSON.stringify(runtime.render(settingsComponent, {}))
+    assert.ok(json.includes('Cancel sign-in'), 'the reopened panel restores the pending authorization card')
+    assert.ok(json.includes('Open authorization page'), 'the rebuilt authorization link is available for reattach')
+    assert.equal(countAction(harness, 'start-login'), 0, 'reattach never starts a new authorization')
+    await harness.clock.advance()
+    assert.ok(countAction(harness, 'login-status') >= 1, 'the reattached wait resumes polling')
+    findButtons(runtime.render(settingsComponent, {}), 'Cancel sign-in')[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'cancel-login'), 1, 'the reattached card can cancel the host authorization')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('pool login: a late reattach response never overrides a newer login', async () => {
+  // The reattach request parks while the user starts login A2; when the old
+  // response lands it must not take the card or the wait back to A1.
+  let releaseReattach
+  const reattachPromise = new Promise(resolve => { releaseReattach = resolve })
+  const harness = createSettingsHarness({
+    connections: settingsConnectionsPayload(),
+    extraResponses: {
+      '/account-usage:connection-action': (payload) => {
+        if (payload?.action === 'pending-login') return reattachPromise
+        if (payload?.action === 'start-login') return { challenge: { loginId: 'A2', authUrl: 'https://example.com/agg-a2' } }
+        if (payload?.action === 'login-status') return { status: { kind: 'pending' } }
+        if (payload?.action === 'cancel-login') return {}
+        return {}
+      },
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    findButtons(runtime.render(settingsComponent, {}), 'Antigravity')[0].props.onClick()
+    await flushMicrotasks()
+    findButtons(runtime.render(settingsComponent, {}), '＋ Add account')[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'start-login'), 1, 'login A2 started while the reattach was parked')
+    assert.ok(JSON.stringify(runtime.render(settingsComponent, {})).includes('agg-a2'), 'the card shows the A2 authorization link')
+    releaseReattach({ ok: true, value: { login: { loginId: 'A1', authUrl: 'https://example.com/agg-a1' } } })
+    await flushMicrotasks()
+    const late = JSON.stringify(runtime.render(settingsComponent, {}))
+    assert.ok(!late.includes('agg-a1'), 'the late reattach response must not take over the card')
+    assert.ok(late.includes('agg-a2'), 'the newer login stays on screen')
+    await harness.clock.advance()
+    const lastPoll = harness.rpcCalls.filter(entry => entry.endpoint === 'connection-action' && entry.payload?.action === 'login-status').pop()
+    assert.equal(lastPoll.payload.params.loginId, 'A2', 'the wait keeps polling the current login')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('pool login: the abandoned poll does not unlock a cancel still in flight', async () => {
+  let releaseCancel
+  const cancelPromise = new Promise(resolve => { releaseCancel = resolve })
+  const harness = createSettingsHarness({
+    connections: settingsConnectionsPayload(),
+    extraResponses: {
+      '/account-usage:connection-action': (payload) => {
+        if (payload?.action === 'pending-login') return { login: null, active: false }
+        if (payload?.action === 'start-login') return { challenge: { loginId: 'L1', authUrl: 'https://example.com/agg' } }
+        if (payload?.action === 'login-status') return { status: { kind: 'pending' } }
+        if (payload?.action === 'cancel-login') return cancelPromise
+        return {}
+      },
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    findButtons(runtime.render(settingsComponent, {}), 'Antigravity')[0].props.onClick()
+    await flushMicrotasks()
+    findButtons(runtime.render(settingsComponent, {}), '＋ Add account')[0].props.onClick()
+    await flushMicrotasks()
+    // Cancel with a deliberately delayed RPC; the abandoned poll's timer
+    // fires while the cancel-login is still parked.
+    findButtons(runtime.render(settingsComponent, {}), 'Cancel sign-in')[0].props.onClick()
+    await flushMicrotasks()
+    let add = findButtons(runtime.render(settingsComponent, {}), '＋ Add account')[0]
+    assert.equal(add.props.disabled, true, 'the cancel in flight holds the busy gate')
+    await harness.clock.advance()
+    add = findButtons(runtime.render(settingsComponent, {}), '＋ Add account')[0]
+    assert.equal(add.props.disabled, true, 'the abandoned poll must not release the cancel busy gate')
+    releaseCancel({ ok: true, value: {} })
+    await flushMicrotasks()
+    add = findButtons(runtime.render(settingsComponent, {}), '＋ Add account')[0]
+    assert.equal(add.props.disabled, false, 'the busy gate releases when the cancel settles')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('credential writes mirror the host api-remotes contract', () => {
+  // The host's own ui-settings-models page writes credentials through
+  // ctx.remote.credentials (api-remotes): set(ref, value) + describe([ref])
+  // answering { ok, value | error } with the describe payload keyed by ref.
+  assert.match(source, /remote\.credentials\.set\(ref, value\)/)
+  assert.match(source, /remote\.credentials\.describe\(\[ref\]\)/)
+  assert.match(source, /setResponse\?\.ok !== true/)
+  assert.match(source, /describe\.value\?\.\[ref\]\?\.configured/)
+  assert.ok(!source.includes('ctx.connection.api'), 'the nonexistent connection.api facade must not be referenced')
 })
 
 test('fullscreen panel: styled account tabs, sub-card strip and stable stack colors', () => {
@@ -545,12 +881,33 @@ function createHookHarness({ controlled = [], responses = new Map() } = {}) {
     return Promise.resolve({ ok: true, value: typeof value === 'function' ? value(payload) : value })
   }
   const registrations = []
+  const credentialSets = []
+  // window.open is part of the local login contract (the authorization page
+  // may open only for a live panel): record every call so tests can prove
+  // nothing opens from a late challenge after unmount.
+  const windowOpens = []
   const ctx = {
     slots: {
       inject: (name, register) => register(),
       register: (definition, component) => { registrations.push({ definition, component }); return () => {} },
     },
-    connection: { rpc: { call }, api: { credentials: { set: async () => ({ result: { ok: true } }) } } },
+    connection: {
+      rpc: { call },
+    },
+    remote: {
+      credentials: {
+        // api-remotes namespace (same contract as the host's own
+        // ui-settings-models): set(ref, value) + describe([ref]) answer
+        // { ok, value | error }. The tests record set() calls so they can
+        // prove writes go through the owner API, never around it, and
+        // describe() confirms the stored ref.
+        set: async (ref, value) => { credentialSets.push({ ref, value }); return { ok: true } },
+        describe: async (refs) => ({
+          ok: true,
+          value: Object.fromEntries((refs ?? []).map((ref) => [ref, { configured: true }])),
+        }),
+      },
+    },
     locale: undefined,
     effect: (fn) => fn(),
   }
@@ -563,7 +920,7 @@ function createHookHarness({ controlled = [], responses = new Map() } = {}) {
     __ModuleLoader__: { load: (loaded) => { bundle = loaded } },
     addEventListener: () => {},
     removeEventListener: () => {},
-    open: () => {},
+    open: (...args) => { windowOpens.push(args) },
   }
   new Function('window', 'require', source)(windowMock, require)
   bundle.factory(require).apply(ctx)
@@ -578,6 +935,8 @@ function createHookHarness({ controlled = [], responses = new Map() } = {}) {
     overlayComponent: findComponent('shell.overlay'),
     entryComponent: findComponent('sidebar.footer.action'),
     rpcCalls,
+    credentialSets,
+    windowOpens,
     pending: (key) => pendingByEndpoint.get(key) ?? [],
     count: (endpoint) => rpcCalls.filter((entry) => entry.endpoint === endpoint).length,
   }
@@ -1126,5 +1485,886 @@ test('localJson: read/write/remove with fallbacks for missing, corrupt and legac
     assert.deepEqual(store.read(), { fallback: true })
   } finally {
     globalThis.localStorage = previous
+  }
+})
+
+// ---------------------------------------------------------------------------
+// P1-C: the Accounts & Models native settings section. Everything below
+// drives the actually registered component through the hook harness — no
+// source-string assertions. The section's only automatic data source is the
+// read-only `connections` RPC; statistics channels, dashboard mounts and
+// provider refresh/sync/login stay out unless a user action fires them.
+// ---------------------------------------------------------------------------
+
+/** Collect every rendered button whose children JSON contains the label. */
+function findButtons(tree, label) {
+  const found = []
+  const walk = (node) => {
+    if (node === null || node === undefined || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    if (node.type === 'button' && JSON.stringify(node.children ?? []).includes(`"${label}"`)) found.push(node)
+    ;(node.children ?? []).forEach(walk)
+  }
+  walk(tree)
+  return found
+}
+
+const settingsConnectionsPayload = () => ({
+  adapters: [],
+  connections: [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: true, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+    { providerId: 'ollama-cloud', displayName: 'Ollama Cloud', configured: true, credentialKind: 'api_key_or_manual_cookie', credentialStatus: 'manual-cookie', credentialRef: 'OLLAMA_SESSION_COOKIE', observationSource: 'official_ui' },
+    { providerId: 'glm', displayName: 'GLM / Z.AI', configured: false, credentialKind: 'raw_authorization', credentialRef: 'ZAI_CODING_CN_API_KEY', observationSource: 'official_plugin_internal_api' },
+    { providerId: 'ollama-local', displayName: 'Ollama Local', configured: false, quotaApplicable: false, observationSource: 'none' },
+    { providerId: 'antigravity', connectionId: 'account-a', displayName: 'one@example.com', configured: true, credentialKind: 'oauth', credentialRef: 'ANTIGRAVITY_ACCESS_TOKEN', observationSource: 'official_usage_api' },
+  ],
+  modelCatalogs: [{ providerId: 'ollama-cloud', routeId: 'ollama-cloud', configured: true, modelCount: 3, credentialConfigured: true }],
+  antigravity: {
+    activeAccountId: 'account-a', autoFailover: true,
+    accounts: [
+      { provider: 'antigravity', configured: true, accountId: 'account-a', active: true, email: 'one@example.com', expires: 4102444800000, expired: false },
+      { provider: 'antigravity', configured: true, accountId: 'account-b', active: false, email: 'two@example.com', expires: 1, expired: true },
+    ],
+  },
+  privacy: { secretsInRpc: false, secretsInSqlite: false, localLedgerSeparate: true },
+})
+
+function createSettingsHarness({ connections = settingsConnectionsPayload(), summary, extraResponses = {}, controlled = [] } = {}) {
+  const responses = new Map([
+    ['/account-usage:connections', connections],
+    ['/account-usage:pending-login', { login: null, active: false }],
+    ...Object.entries(extraResponses),
+  ])
+  if (summary !== undefined) responses.set('/account-usage:summary', summary)
+  const harness = createHookHarness({ responses, controlled })
+  harness.settingsComponent = harness.registrations.find(({ definition }) => definition.name === 'settings.section').component
+  return harness
+}
+
+const SETTINGS_QUIET_ENDPOINTS = [
+  'summary', 'query', 'entry-summary', 'import-status', 'settings', 'overview',
+  'sync-model-catalog', 'refresh-observations', 'observe-provider',
+]
+
+/** connection-action calls are endpoint+action; count by the action payload. */
+function countAction(harness, action) {
+  return harness.rpcCalls.filter((entry) => entry.endpoint === 'connection-action' && entry.payload?.action === action).length
+}
+
+/** Every call that went through the statistics channel — always zero here. */
+const tokenUsageChannelCalls = (harness) => harness.rpcCalls.filter((entry) => entry.channel === '/token-usage').length
+
+/** Collect every rendered input whose placeholder contains the fragment. */
+function findInputs(tree, placeholderFragment) {
+  const found = []
+  const walk = (node) => {
+    if (node === null || node === undefined || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(walk); return }
+    if (node.type === 'input' && String(node.props?.placeholder ?? '').includes(placeholderFragment)) found.push(node)
+    ;(node.children ?? []).forEach(walk)
+  }
+  walk(tree)
+  return found
+}
+
+test('settings section mounts read-only: connections facts only, honest badges, no statistics or refresh', async () => {
+  const harness = createSettingsHarness()
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent, count, rpcCalls } = harness
+    const tree = runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const settled = runtime.render(settingsComponent, {})
+    const json = JSON.stringify(settled)
+
+    // The one automatic call is the read-only connections endpoint.
+    assert.equal(count('connections'), 1)
+    for (const endpoint of SETTINGS_QUIET_ENDPOINTS) {
+      assert.equal(count(endpoint), 0, `settings mount must not call ${endpoint}`)
+    }
+    for (const action of ['start-login', 'cancel-login', 'login-status', 'logout', 'pending-login']) {
+      assert.equal(countAction(harness, action), 0, `settings mount must not run ${action}`)
+    }
+
+    // Facts render per source; the Antigravity pool collapses into one entry.
+    assert.ok(json.includes('OpenAI Codex (ChatGPT subscription)'), 'codex connection fact missing')
+    assert.ok(json.includes('Connection ID') && json.includes('openai-codex:default'), 'connection id fact visible')
+    assert.ok(json.includes('4 connection(s)'), 'connection count shown; the hidden local service is excluded')
+    assert.ok(findButtons(settled, 'Ollama Local').length === 0, 'Ollama Local has no account surface — kept out of the panel')
+    assert.ok(json.includes('Antigravity') && json.includes('2 account(s)'), 'pool source with its account summary shown')
+
+    // Evidence-only states: a stored quota cookie is configured, never a
+    // verified model call; an unconfigured provider reads as not connected.
+    assert.ok(json.includes('Configured · no official check'), 'unverified credential state shown')
+    assert.ok(json.includes('Not connected'), 'unconfigured state shown')
+    const connectedBadges = (JSON.stringify(settled).match(/"Connected"/g) ?? []).length
+    assert.equal(connectedBadges, 2, 'the oauth provider reads as Connected in its list row and detail head; the cookie path must not')
+
+    // The cached model catalog rides with the Ollama Cloud detail (B-form).
+    findButtons(runtime.render(settingsComponent, {}), 'Ollama Cloud')[0].props.onClick()
+    await flushMicrotasks()
+    const withCatalog = JSON.stringify(runtime.render(settingsComponent, {}))
+    assert.ok(withCatalog.includes('Sync Cloud models (3)'), 'cached catalog count shown in the ollama-cloud detail')
+    assert.equal(count('sync-model-catalog'), 0, 'catalog display never syncs by itself')
+
+    // The pool detail carries the account roster (B-form).
+    findButtons(runtime.render(settingsComponent, {}), 'Antigravity')[0].props.onClick()
+    await flushMicrotasks()
+    const poolTree = runtime.render(settingsComponent, {})
+    const withPool = JSON.stringify(poolTree)
+    assert.ok(withPool.includes('one@example.com'), 'the active pool account email shows in the pool detail')
+    assert.ok(withPool.includes('two@example.com'), 'the standby pool account email shows in the pool detail')
+    assert.ok(withPool.includes('Account pool · 2'), 'pool head shows the account count')
+    // An expired ACCESS token refreshes on next use — the expired standby
+    // keeps the activation action; only removal is destructive.
+    assert.equal(findButtons(poolTree, 'Set active').length, 1, 'the expired standby still offers activation')
+    assert.ok(!withPool.includes('Sign in again'), 'an expired access token must not swap the action for a re-login')
+    assert.deepEqual(rpcCalls.filter((entry) => entry.endpoint === 'summary'), [])
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('settings section: refresh is explicit and touches only the connections endpoint; empty state is clear', async () => {
+  const harness = createSettingsHarness()
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent, count } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const refresh = findButtons(runtime.render(settingsComponent, {}), 'Refresh connections')
+    assert.equal(refresh.length, 1)
+    refresh[0].props.onClick()
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    assert.equal(count('connections'), 2, 'explicit refresh refetches connection facts')
+    for (const endpoint of SETTINGS_QUIET_ENDPOINTS) {
+      assert.equal(count(endpoint), 0, `refresh must not call ${endpoint}`)
+    }
+    for (const action of ['start-login', 'cancel-login', 'login-status', 'logout', 'pending-login']) {
+      assert.equal(countAction(harness, action), 0, `refresh must not run ${action}`)
+    }
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+
+  // Empty connection list: a clear hint instead of a blank section.
+  const emptyHarness = createSettingsHarness({ connections: { connections: [], modelCatalogs: [], antigravity: null, privacy: {} } })
+  const emptyRestore = installClientGlobals(emptyHarness)
+  try {
+    const { runtime, settingsComponent } = emptyHarness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const json = JSON.stringify(runtime.render(settingsComponent, {}))
+    assert.ok(json.includes('No provider connections detected'), 'empty state message missing')
+    emptyHarness.runtime.unmountAll()
+  } finally {
+    emptyRestore()
+  }
+})
+
+// C-001 regression: expanding a row must NOT load the analytics summary.
+// The old draft asserted summary=1 here — that was the bug (the shared
+// ConnectionSection pulled in ensureAccountSummary), now the expanded panel
+// runs in facts mode and the statistics path stays at zero.
+test('settings section: manage expands the shared ConnectionSection on connections facts only; statistics stay out', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: true, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+    { providerId: 'glm', displayName: 'GLM / Z.AI', configured: false, credentialKind: 'raw_authorization', credentialRef: 'ZAI_CODING_CN_API_KEY', observationSource: 'official_plugin_internal_api' },
+  ]
+  // `summary` is deliberately mapped (a live host would offer it) to prove
+  // the section never reaches for it, and every /token-usage endpoint stays
+  // unmapped so any statistics call would fail loudly.
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent, count } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('summary'), 0, 'collapsed section never loads the summary')
+    assert.equal(tokenUsageChannelCalls(harness), 0, 'no statistics channel call on mount')
+
+    // Expanding a connection is an explicit user action, but it is NOT
+    // consent for the analytics summary: the reused ConnectionSection reads
+    // the already-loaded read-only facts and fires no RPC at all.
+    // Selecting a source mounts the shared ConnectionSection in the detail
+    // pane on the already-loaded facts — an explicit user action, but NOT
+    // consent for the analytics summary.
+    const codexItem = findButtons(runtime.render(settingsComponent, {}), 'OpenAI Codex (ChatGPT subscription)')
+    assert.equal(codexItem.length, 1, 'one list entry per source')
+    codexItem[0].props.onClick()
+    await flushMicrotasks()
+    let expanded = runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    expanded = runtime.render(settingsComponent, {})
+    assert.equal(count('summary'), 0, 'selecting must not load the analytics summary (C-001)')
+    assert.equal(findButtons(expanded, 'Disconnect').length, 1, 'the real connection controls render from facts')
+
+    // Select the other source: still zero summary calls, and the shared
+    // facts are reused instead of refetched (minimal loading).
+    findButtons(runtime.render(settingsComponent, {}), 'GLM / Z.AI')[0].props.onClick()
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('summary'), 0, 'switching rows still never loads the summary')
+    assert.equal(count('connections'), 1, 'expand/switch reuse the loaded facts; no refetch')
+    // No write path may run by itself.
+    for (const action of ['start-login', 'logout', 'cancel-login', 'login-status']) {
+      assert.equal(countAction(harness, action), 0, `${action} must stay user-triggered`)
+    }
+    for (const endpoint of ['sync-model-catalog', 'observe-provider', 'refresh-observations']) {
+      assert.equal(count(endpoint), 0, `${endpoint} must stay user-triggered`)
+    }
+    assert.equal(tokenUsageChannelCalls(harness), 0, 'the usage statistics channel is never touched')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+// C-001 acceptance: with the whole statistics world failing (unmapped
+// `summary`, unmapped /token-usage endpoints) the settings management flow
+// must stay fully usable, and every explicit owner action must refresh the
+// read-only connections facts instead of the analytics summary.
+test('settings section: with statistics failing, expanded controls stay usable and explicit owner actions reload the connections facts', async () => {
+  let rows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: true, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+    { providerId: 'ollama-cloud', displayName: 'Ollama Cloud', configured: true, credentialKind: 'api_key_or_manual_cookie', credentialStatus: 'manual-cookie', credentialRef: 'OLLAMA_SESSION_COOKIE', observationSource: 'official_ui' },
+    { providerId: 'glm', displayName: 'GLM / Z.AI', configured: false, credentialKind: 'raw_authorization', credentialRef: 'ZAI_CODING_CN_API_KEY', observationSource: 'official_plugin_internal_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: () => ({
+      adapters: [],
+      connections: rows,
+      modelCatalogs: [{ providerId: 'ollama-cloud', routeId: 'ollama-cloud', configured: true, modelCount: 2, credentialConfigured: true }],
+      antigravity: null,
+      privacy: {},
+    }),
+    extraResponses: {
+      '/account-usage:sync-model-catalog': () => ({ added: 2, updated: 0 }),
+      '/account-usage:connection-action': (payload) => {
+        if (payload?.action === 'logout') {
+          rows = rows.map((row) => row.providerId === 'openai-codex' ? { ...row, configured: false } : row)
+          return {}
+        }
+        if (payload?.action === 'start-login') return { challenge: { loginId: 'L2', verificationUri: 'https://example.com/activate' } }
+        if (payload?.action === 'login-status') {
+          rows = rows.map((row) => row.providerId === 'openai-codex' ? { ...row, configured: true } : row)
+          return { status: { kind: 'succeeded' } }
+        }
+        return {}
+      },
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent, count } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    assert.equal(count('summary'), 0)
+
+    // Select the codex source: the real controls render from facts while the
+    // statistics endpoint would fail on every call.
+    findButtons(runtime.render(settingsComponent, {}), 'OpenAI Codex (ChatGPT subscription)')[0].props.onClick()
+    await flushMicrotasks()
+    let tree = runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    assert.equal(count('summary'), 0, 'expanding never calls the failing statistics endpoint')
+    const disconnect = findButtons(tree, 'Disconnect')
+    assert.equal(disconnect.length, 1, 'the connection controls are usable with statistics down')
+
+    // Explicit disconnect: the host owner action, then exactly one facts
+    // reload — no summary, no statistics channel, no ledger write.
+    disconnect[0].props.onClick()
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    assert.equal(countAction(harness, 'logout'), 1, 'disconnect went through the host owner action')
+    assert.equal(count('connections'), 2, 'the action reloaded the read-only facts exactly once')
+    assert.equal(count('summary'), 0, 'no statistics call followed the action')
+    assert.equal(tokenUsageChannelCalls(harness), 0, 'the usage ledger channel was never touched')
+
+    // Switch to the ollama source: explicit model sync through the owner
+    // endpoint, then the facts reload.
+    findButtons(runtime.render(settingsComponent, {}), 'Ollama Cloud')[0].props.onClick()
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    const sync = findButtons(tree, 'Sync Cloud models (2)')
+    assert.equal(sync.length, 1, 'the model sync control is available on the expanded row')
+    assert.equal(count('sync-model-catalog'), 0, 'sync stays user-triggered')
+    sync[0].props.onClick()
+    await flushMicrotasks()
+    await flushMicrotasks()
+    assert.equal(count('sync-model-catalog'), 1, 'the sync reached the owner endpoint once')
+    assert.equal(count('connections'), 3, 'the sync reloaded the read-only facts')
+    assert.equal(count('summary'), 0, 'still no statistics call')
+
+    // GLM credential save: the high-level credentials facade writes the
+    // credential (never a direct settings/credential store write) and the
+    // facts reload.
+    findButtons(runtime.render(settingsComponent, {}), 'GLM / Z.AI')[0].props.onClick()
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    const glmInput = findInputs(tree, 'ZAI_CODING_CN_API_KEY')
+    assert.equal(glmInput.length, 1, 'the GLM credential input renders')
+    glmInput[0].props.onChange({ target: { value: ' test-key-value ' } })
+    await flushMicrotasks()
+    const save = findButtons(runtime.render(settingsComponent, {}), 'Save credential')
+    assert.equal(save.length, 1, 'the save control is available')
+    assert.equal(save[0].props.disabled, false, 'save enables once a draft exists')
+    save[0].props.onClick()
+    await flushMicrotasks()
+    await flushMicrotasks()
+    assert.equal(harness.credentialSets.length, 1, 'the save went through the credentials facade')
+    assert.deepEqual(harness.credentialSets[0], { ref: 'ZAI_CODING_CN_API_KEY', value: 'test-key-value' })
+    assert.equal(count('connections'), 4, 'the credential save reloaded the facts')
+    assert.equal(count('summary'), 0, 'still zero statistics calls')
+
+    // Codex sign-in: explicit connect starts the host authorization, the
+    // local wait succeeds, and the facts reload — the summary stays silent.
+    findButtons(runtime.render(settingsComponent, {}), 'OpenAI Codex (ChatGPT subscription)')[0].props.onClick()
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    const connect = findButtons(tree, 'Connect')
+    assert.equal(connect.length, 1, 'the sign-in control is available for the unconfigured oauth row')
+    connect[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'start-login'), 1, 'connect started the host authorization exactly once')
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'the local wait polled the host status once')
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    tree = runtime.render(settingsComponent, {})
+    assert.equal(count('connections'), 5, 'the login success reloaded the read-only facts')
+    assert.equal(count('summary'), 0, 'the whole management flow stayed off the statistics path')
+    assert.equal(tokenUsageChannelCalls(harness), 0, 'no ledger write, no usage import, nothing')
+    runtime.unmountAll()
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'no wait loop survives the section')
+  } finally {
+    restore()
+  }
+})
+
+test('connection login wait dies with the section and never cancels the host authorization', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    extraResponses: {
+      '/account-usage:connection-action': (payload) => {
+        if (payload?.action === 'start-login') return { challenge: { loginId: 'L1', verificationUri: 'https://example.com/activate' } }
+        if (payload?.action === 'login-status') return { status: { kind: 'pending' } }
+        return {}
+      },
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent, count, rpcCalls } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    // The detail pane mounts the connection controls for the default source;
+    // a few flush passes let the facts land and the reattach effect run.
+    for (let i = 0; i < 3; i += 1) {
+      runtime.render(settingsComponent, {})
+      await flushMicrotasks()
+    }
+    // The reattach pass is non-destructive: it asks for a pending login
+    // (status query only), never starts one.
+    assert.equal(countAction(harness, 'pending-login'), 1)
+    assert.equal(countAction(harness, 'start-login'), 0)
+
+    // Explicit connect: start-login, then the local 1.5s wait loop polls
+    // login-status.
+    const connect = findButtons(runtime.render(settingsComponent, {}), 'Connect')
+    assert.equal(connect.length, 1)
+    connect[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'start-login'), 1)
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'local wait polls the login status')
+
+    // Section unmount (collapse/close): the local wait stops and no host
+    // cancel-login fires — the device authorization keeps running.
+    runtime.unmountAll()
+    await harness.clock.advance()
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'no login-status polls after unmount')
+    assert.equal(countAction(harness, 'cancel-login'), 0, 'closing the page must not cancel the host authorization')
+    assert.equal(countAction(harness, 'logout'), 0, 'closing the page must not log out')
+  } finally {
+    restore()
+  }
+})
+
+test('explicit user cancel asks the host once and stops the local wait; reopening reattaches via pending-login only', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    extraResponses: {
+      '/account-usage:connection-action': (payload) => {
+        if (payload?.action === 'pending-login') return { login: { loginId: 'P1', userCode: 'CODE-1', verificationUri: 'https://example.com/activate' } }
+        if (payload?.action === 'login-status') return { status: { kind: 'pending' } }
+        if (payload?.action === 'cancel-login') return {}
+        return {}
+      },
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent, count } = harness
+    // Mount with a live pending login: the section reattaches to it through
+    // the non-destructive pending-login query and resumes the local wait.
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    // A few flush passes let the facts land and the reattach effect run.
+    for (let i = 0; i < 3; i += 1) {
+      runtime.render(settingsComponent, {})
+      await flushMicrotasks()
+    }
+    const tree = runtime.render(settingsComponent, {})
+    const json = JSON.stringify(tree)
+    assert.ok(json.includes('CODE-1'), 'reattached pending login shows the device code')
+    assert.equal(countAction(harness, 'pending-login'), 1, 'reattach used the pending-login status query')
+    assert.equal(countAction(harness, 'start-login'), 0, 'reattach never starts a new authorization')
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'reattached wait resumes polling')
+
+    // The user clicks Cancel sign-in: the host is asked once and the local
+    // wait stops — distinct from the unmount path above.
+    const cancel = findButtons(runtime.render(settingsComponent, {}), 'Cancel sign-in')
+    assert.equal(cancel.length, 1)
+    cancel[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'cancel-login'), 1, 'explicit cancel reaches the host once')
+    await harness.clock.advance()
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'local wait stopped after explicit cancel')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+test('settings section: unknown model catalog state is explicit and never syncs by itself', async () => {
+  const harness = createSettingsHarness({
+    connections: {
+      adapters: [],
+      connections: [{ providerId: 'ollama-cloud', displayName: 'Ollama Cloud', configured: true, credentialKind: 'api_key_or_manual_cookie', credentialStatus: 'unverified', credentialRef: 'OLLAMA_API_KEY', observationSource: 'official_response' }],
+      modelCatalogs: [{ providerId: 'ollama-cloud', routeId: 'ollama-cloud', configured: true, modelCount: 0, credentialConfigured: true }],
+      antigravity: null,
+      privacy: {},
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent, count } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const json = JSON.stringify(runtime.render(settingsComponent, {}))
+    assert.ok(json.includes('Sync Cloud models (0)'), 'the cached catalog count renders explicitly — zero means nothing cached yet')
+    assert.equal(count('sync-model-catalog'), 0, 'no automatic model synchronization')
+    runtime.unmountAll()
+  } finally {
+    restore()
+  }
+})
+
+// ---------------------------------------------------------------------------
+// AC-001 + OUT-AC-001 regressions (governance round 2, on the 5.1.3 base).
+// The parent repro scripts (login-unmount-repro.mjs / glm-label-repro.mjs)
+// asserted these as frozen-candidate defects; the cases below pin the fixed
+// behavior with the same fake-RPC/fake-clock harness. No credentials, no
+// browser, no provider network.
+// ---------------------------------------------------------------------------
+
+// OUT-AC-001: closing the section while the start-login RPC is still in
+// flight. The late challenge must not update local state, must not open the
+// authorization page, and must not create a new login-status wait — while the
+// host-owned authorization itself is never cancelled or logged out.
+test('closing while start-login is in flight: the late challenge starts nothing local', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    controlled: ['/account-usage:connection-action'],
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    for (let i = 0; i < 3; i += 1) {
+      await flushMicrotasks()
+      runtime.render(settingsComponent, {})
+    }
+    const connect = findButtons(runtime.render(settingsComponent, {}), 'Connect')[0]
+    assert.ok(connect, 'the sign-in control renders for the unconfigured oauth row')
+    connect.props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'start-login'), 1, 'connect started the host authorization')
+
+    // Close the section while start-login is still parked in flight.
+    runtime.unmountAll()
+    const parked = harness.pending('/account-usage:connection-action').find(entry => entry.payload?.action === 'start-login')
+    assert.ok(parked, 'start-login stayed in flight across the unmount')
+    parked.resolve({ ok: true, value: { challenge: { loginId: 'late-start', verificationUri: 'https://example.invalid/activate' } } })
+    await flushMicrotasks()
+    await harness.clock.advance()
+    await harness.clock.advance()
+
+    assert.equal(countAction(harness, 'login-status'), 0, 'a late challenge must not start login-status polling after unmount')
+    assert.equal(harness.windowOpens.length, 0, 'a late challenge must not open the authorization page after unmount')
+    assert.equal(countAction(harness, 'cancel-login'), 0, 'closing the page never cancels the host authorization')
+    assert.equal(countAction(harness, 'logout'), 0, 'closing the page never logs out')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
+  }
+})
+
+// OUT-AC-001: an in-flight login-status poll that RESOLVES after unmount.
+// The wait dies silently: no state refresh, no further polls, no host cancel.
+test('a login-status response landing after unmount changes nothing and starts nothing', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    controlled: ['/account-usage:connection-action'],
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    for (let i = 0; i < 3; i += 1) {
+      await flushMicrotasks()
+      runtime.render(settingsComponent, {})
+    }
+    findButtons(runtime.render(settingsComponent, {}), 'Connect')[0].props.onClick()
+    await flushMicrotasks()
+    const parkedStart = harness.pending('/account-usage:connection-action').find(entry => entry.payload?.action === 'start-login')
+    parkedStart.resolve({ ok: true, value: { challenge: { loginId: 'L1', verificationUri: 'https://example.invalid/activate' } } })
+    await flushMicrotasks()
+    assert.equal(harness.windowOpens.length, 1, 'the authorization page opened exactly once while mounted')
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'the local wait polled once while mounted')
+
+    // Unmount while that login-status RPC is still parked in flight.
+    runtime.unmountAll()
+    const parkedPoll = harness.pending('/account-usage:connection-action').find(entry => entry.payload?.action === 'login-status')
+    parkedPoll.resolve({ ok: true, value: { status: { kind: 'succeeded' } } })
+    await flushMicrotasks()
+    await harness.clock.advance()
+    await harness.clock.advance()
+
+    assert.equal(countAction(harness, 'login-status'), 1, 'no further polls after unmount')
+    assert.equal(harness.count('connections'), 1, 'the late success must not reload the facts after unmount')
+    assert.equal(countAction(harness, 'cancel-login'), 0, 'unmount never cancels the host authorization')
+    assert.equal(countAction(harness, 'logout'), 0, 'unmount never logs out')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
+  }
+})
+
+// OUT-AC-001: identity switch while start-login is in flight. Collapsing the
+// codex row and expanding the xai row replaces the panel; the late challenge
+// for the previous identity must strand silently instead of driving the new
+// panel's state, timers or facts.
+test('switching connection identity while start-login is in flight strands the late challenge', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+    { providerId: 'xai', displayName: 'Grok / X subscription', configured: false, credentialKind: 'oauth', credentialRef: 'XAI_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    controlled: ['/account-usage:connection-action'],
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    for (let i = 0; i < 3; i += 1) {
+      await flushMicrotasks()
+      runtime.render(settingsComponent, {})
+    }
+    findButtons(runtime.render(settingsComponent, {}), 'Connect')[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'start-login'), 1, 'the codex row started its host authorization')
+
+    // Switch identity: select the xai source in the list.
+    findButtons(runtime.render(settingsComponent, {}), 'Grok / X subscription')[0].props.onClick()
+    for (let i = 0; i < 3; i += 1) {
+      await flushMicrotasks()
+      runtime.render(settingsComponent, {})
+    }
+
+    // The codex start-login challenge lands after the switch.
+    const parkedStart = harness.pending('/account-usage:connection-action').find(entry => entry.payload?.action === 'start-login')
+    parkedStart.resolve({ ok: true, value: { challenge: { loginId: 'late-codex', verificationUri: 'https://example.invalid/activate' } } })
+    await flushMicrotasks()
+    await harness.clock.advance()
+    await harness.clock.advance()
+
+    assert.equal(countAction(harness, 'login-status'), 0, 'the stranded challenge must not poll for any identity')
+    assert.equal(harness.windowOpens.length, 0, 'the stranded challenge must not open the authorization page')
+    assert.equal(countAction(harness, 'cancel-login'), 0, 'an identity switch never cancels the host authorization')
+    assert.equal(harness.count('connections'), 1, 'the stranded challenge must not reload the shared facts')
+    const reconnected = findButtons(runtime.render(settingsComponent, {}), 'Connect')[0]
+    assert.ok(reconnected, 'the new identity keeps its own sign-in control')
+    assert.equal(reconnected.props.disabled, false, 'the identity switch released the abandoned login busy gate')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
+  }
+})
+
+// OUT-AC-001: reopening after a guarded unmount must still reattach to the
+// host-owned pending login through the non-destructive pending-login query —
+// without starting a new authorization.
+test('reopening the section after a guarded unmount reattaches through pending-login only', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    controlled: ['/account-usage:connection-action'],
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    for (let i = 0; i < 3; i += 1) {
+      await flushMicrotasks()
+      runtime.render(settingsComponent, {})
+    }
+    findButtons(runtime.render(settingsComponent, {}), 'Connect')[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'start-login'), 1)
+    runtime.unmountAll()
+    const parkedStart = harness.pending('/account-usage:connection-action').find(entry => entry.payload?.action === 'start-login')
+    parkedStart.resolve({ ok: true, value: { challenge: { loginId: 'L9', verificationUri: 'https://example.invalid/activate' } } })
+    await flushMicrotasks()
+    assert.equal(countAction(harness, 'login-status'), 0, 'the unmounted panel never polled')
+
+    // Reopen: a fresh mount reattaches to the same host-owned login. The
+    // pending-login response is parked while ordinary state-driven re-render
+    // passes run (and a dep-changing explicit refresh forces a real effect
+    // cleanup/re-run) — none of that may tear the reattach down (R2-AC-001).
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const parkedReattach = [...harness.pending('/account-usage:connection-action')].reverse().find(entry => entry.payload?.action === 'pending-login')
+    assert.ok(parkedReattach, 'the reopened panel queried pending-login')
+    // State-driven render passes while the response is still parked.
+    for (let i = 0; i < 3; i += 1) {
+      runtime.render(settingsComponent, {})
+      await flushMicrotasks()
+    }
+    // An explicit facts refresh changes the effect deps (data.value) and
+    // forces a real cleanup/re-run cycle; the parked response must survive it.
+    const connectionsBeforeRefresh = harness.count('connections')
+    findButtons(runtime.render(settingsComponent, {}), 'Refresh connections')[0].props.onClick()
+    await flushMicrotasks()
+    assert.equal(harness.count('connections'), connectionsBeforeRefresh + 1, 'the explicit refresh reloaded the facts while pending-login was parked')
+    // Only now does the host answer.
+    parkedReattach.resolve({ ok: true, value: { login: { loginId: 'L9', userCode: 'CODE-9', verificationUri: 'https://example.invalid/activate' } } })
+    await flushMicrotasks()
+    const reopened = runtime.render(settingsComponent, {})
+    assert.ok(JSON.stringify(reopened).includes('CODE-9'), 'the reopened panel shows the pending device code after state-driven re-renders')
+    assert.equal(countAction(harness, 'pending-login'), 2, 'exactly one pending-login query per mount, no refire from dep churn')
+    assert.equal(countAction(harness, 'start-login'), 1, 'reattach never starts a new authorization')
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'the live panel resumes its own local wait')
+    assert.equal(countAction(harness, 'cancel-login'), 0, 'no cancel fired anywhere in the flow')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
+  }
+})
+
+// R2-AC-001 (first mount, slow RPC): a pending-login response that lands only
+// after state-driven re-render passes must still reattach — the reattach is
+// bound to the panel lifecycle, not to one effect run.
+test('a slow pending-login response survives state-driven re-renders and reattaches on first mount', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    controlled: ['/account-usage:connection-action'],
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const parkedReattach = harness.pending('/account-usage:connection-action').find(entry => entry.payload?.action === 'pending-login')
+    assert.ok(parkedReattach, 'the mounted panel queried pending-login')
+    // State-driven re-render passes (reattach bookkeeping, parent renders)
+    // while the host has not answered yet.
+    for (let i = 0; i < 3; i += 1) {
+      runtime.render(settingsComponent, {})
+      await flushMicrotasks()
+    }
+    parkedReattach.resolve({ ok: true, value: { login: { loginId: 'P1', userCode: 'CODE-DELAYED', verificationUri: 'https://example.invalid/activate' } } })
+    await flushMicrotasks()
+    const tree = runtime.render(settingsComponent, {})
+    assert.ok(JSON.stringify(tree).includes('CODE-DELAYED'), 'the delayed pending login shows the device code')
+    assert.equal(countAction(harness, 'start-login'), 0, 'reattach never starts a new authorization')
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'the reattached wait polls the host status')
+    assert.equal(countAction(harness, 'cancel-login'), 0, 'reattach never cancels the host authorization')
+    runtime.unmountAll()
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 1, 'no polls after unmount')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
+  }
+})
+
+// R2-AC-001 (rejection side): a pending-login response that lands after
+// unmount must change nothing — no device code can matter, no local wait may
+// start, and the host authorization is never cancelled.
+test('a pending-login response landing after unmount starts nothing and cancels nothing', async () => {
+  const connectionRows = [
+    { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: false, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+  ]
+  const harness = createSettingsHarness({
+    connections: { adapters: [], connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    summary: { product: { name: 'DSH Accounts & Usage' }, connections: connectionRows, modelCatalogs: [], antigravity: null, privacy: {} },
+    controlled: ['/account-usage:connection-action'],
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const parkedReattach = harness.pending('/account-usage:connection-action').find(entry => entry.payload?.action === 'pending-login')
+    assert.ok(parkedReattach, 'the mounted panel queried pending-login')
+    for (let i = 0; i < 2; i += 1) {
+      runtime.render(settingsComponent, {})
+      await flushMicrotasks()
+    }
+    runtime.unmountAll()
+    parkedReattach.resolve({ ok: true, value: { login: { loginId: 'P2', userCode: 'CODE-LATE-UNMOUNT', verificationUri: 'https://example.invalid/activate' } } })
+    await flushMicrotasks()
+    await harness.clock.advance()
+    await harness.clock.advance()
+    assert.equal(countAction(harness, 'login-status'), 0, 'a late pending-login must not start polling after unmount')
+    assert.equal(harness.windowOpens.length, 0, 'a late pending login must not open anything after unmount')
+    assert.equal(countAction(harness, 'cancel-login'), 0, 'unmount never cancels the host authorization')
+    assert.equal(countAction(harness, 'logout'), 0, 'unmount never logs out')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
+  }
+})
+
+// AC-001: a stored raw GLM key is configured, never a verified model call.
+// Variant 1 uses the producer shape after the fix (credentialStatus present).
+test('settings: a configured GLM raw key reads as configured-unverified, never Connected (producer marks it)', async () => {
+  const harness = createSettingsHarness({
+    connections: {
+      adapters: [],
+      connections: [
+        { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: true, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+        { providerId: 'glm', displayName: 'GLM / Z.AI', configured: true, credentialKind: 'raw_authorization', credentialStatus: 'unverified', credentialRef: 'ZAI_CODING_CN_API_KEY', observationSource: 'official_plugin_internal_api' },
+      ],
+      modelCatalogs: [],
+      antigravity: null,
+      privacy: {},
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const json = JSON.stringify(runtime.render(settingsComponent, {}))
+    assert.ok(json.includes('Configured · no official check'), 'the stored raw key is labelled configured-unverified')
+    const connectedBadges = (json.match(/"Connected"/g) ?? []).length
+    assert.equal(connectedBadges, 2, 'the oauth provider reads as Connected in its list row and detail head')
+    // Honest badge styling: the official-blue badge appears only for the
+    // oauth row (background + color strings), never for the raw-key row.
+    const officialBadgeMarks = (json.match(/4176e6/g) ?? []).length
+    assert.equal(officialBadgeMarks, 2, 'the raw-key row must not wear the verified-badge styling')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
+  }
+})
+
+// AC-001 variant 2: even when a payload predates the producer marking (no
+// credentialStatus), the shared badge derives the unverified verdict from
+// credentialKind — a stored raw key can never render as Connected.
+test('settings: a raw_authorization key stays configured-unverified even without the producer marking', async () => {
+  const harness = createSettingsHarness({
+    connections: {
+      adapters: [],
+      connections: [
+        { providerId: 'openai-codex', displayName: 'OpenAI Codex (ChatGPT subscription)', configured: true, credentialKind: 'oauth', credentialRef: 'OPENAI_CODEX_OAUTH', observationSource: 'official_usage_api' },
+        { providerId: 'glm', displayName: 'GLM / Z.AI', configured: true, credentialKind: 'raw_authorization', credentialRef: 'ZAI_CODING_CN_API_KEY', observationSource: 'official_plugin_internal_api' },
+      ],
+      modelCatalogs: [],
+      antigravity: null,
+      privacy: {},
+    },
+  })
+  const restore = installClientGlobals(harness)
+  try {
+    const { runtime, settingsComponent } = harness
+    runtime.render(settingsComponent, {})
+    await flushMicrotasks()
+    const json = JSON.stringify(runtime.render(settingsComponent, {}))
+    assert.ok(json.includes('Configured · no official check'), 'the raw key is labelled configured-unverified')
+    const connectedBadges = (json.match(/"Connected"/g) ?? []).length
+    assert.equal(connectedBadges, 2, 'the oauth provider reads as Connected in its list row and detail head')
+    assert.equal((json.match(/4176e6/g) ?? []).length, 2, 'the raw-key row must not wear the verified-badge styling')
+  } finally {
+    harness.runtime.unmountAll()
+    restore()
   }
 })
