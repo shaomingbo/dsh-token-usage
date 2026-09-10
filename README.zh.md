@@ -1,8 +1,14 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` 保留原包名和本地账本。**5.1.4 是未发布的准备候选**，组合治理增量、Antigravity 额度面热修复与 OAuth 生命周期修复。无遥测、不保存提示词、不改 DSH 核心、不新增数据迁移。下方固定 tag 命令仅在对应 tag 实际发布并核验后使用。
+`dsh-token-usage` **5.1.5 是未发布候选**，基于已经存在的 v5.1.4 固定提交 `72ecf169b15a64c6c52a0b83c73c4998d63052fc`，保留治理/OAuth 修复，仅增加 native owner 的 stream 诊断修正。不新增认证、数据迁移、core 补丁或真实提供方调用。下方固定 tag 命令仅在实际发布并验收后使用。
 
-## 5.1.4 候选范围与证据
+## 5.1.5 SDK stream 诊断
+
+配合 compaction 0.4.0，诊断可选终态为 completed、failed、cancelled、timed-out，先记终态再冻结租约；不改变错误身份、取消、期限或 usage。SDK 内部读取的 wire bytes/events 不可观测，明确缺省，绝不从标准化事件伪造计数。Native compact 原计数不变。旧 consumer 遇到新终态可能不显示整份诊断，但不影响执行。假 transport、锁定 SDK 0.84.4 与隔离配对验证，不等同新增真实模型验收。
+
+## 历史 5.1.4 准备范围与证据
+
+以下为当时准备阶段的历史说明；v5.1.4 现已存在，不代表本次新候选已发布或激活生产。
 
 设置页独立读取本地连接事实，不依赖统计库或触发额度刷新；已存原始 key 仍标为已配置但未校验。Antigravity 额度/目录读取优先 daily → prod → sandbox；显式 baseUrl 仍钉死，生成与项目发现路径不变。
 
@@ -63,19 +69,19 @@ comparison 34 + account 266 + paired 17）全绿；最终打包检查与发布 t
 ## 安装（tag 存在后）
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.4` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.5` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1` 或 `0.1.2-alpha.3`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 

@@ -1,8 +1,14 @@
 # DSH Accounts & Usage
 
-`dsh-token-usage` keeps the package name and local ledger. **5.1.4 is an unreleased preparation candidate** combining governance, the Antigravity quota-surface hotfix and the OAuth lifecycle correction. No telemetry, prompt storage, DSH core patches or new data migration. The fixed-tag commands below are for use only after the corresponding tag has actually been published and verified.
+`dsh-token-usage` **5.1.5 is an unreleased candidate**, based on the existing v5.1.4 commit `72ecf169b15a64c6c52a0b83c73c4998d63052fc`. It preserves that release's governance/OAuth fixes and changes only native-owner stream diagnostics. No new authentication, data migration, core patch or real-provider call is introduced by this delta. Fixed-tag commands below require actual publication and acceptance first.
 
-## 5.1.4 candidate scope and evidence
+## 5.1.5 SDK stream diagnostics
+
+Pair with compaction 0.4.0 for optional `completed`, `failed`, `cancelled`, and `timed-out` phases. Record termination before freezing a lease; keep original errors, cancellation, deadlines and usage. SDK-owned wire bytes/events are unknown and omitted, never synthesized from normalized events. Native compact counters remain unchanged. Older consumers may omit the whole diagnostic on unknown terminal phases; execution is unaffected. Fake transport, pinned SDK 0.84.4 and isolated paired snapshots are validated separately from real-model acceptance.
+
+## Historical 5.1.4 preparation scope and evidence
+
+The following evidence describes the earlier preparation; v5.1.4 now exists. It does not establish this new candidate's publication or production activation.
 
 Settings reads local connection facts independently of analytics and quota refresh. Stored raw keys remain configured-unverified. Antigravity quota/catalog reads prefer daily → prod → sandbox; an explicit baseUrl stays pinned, and generation/project discovery are unchanged.
 
@@ -75,19 +81,19 @@ not been shown to cancel it. Persistent upstream failures and hard context limit
 ## Install (after the tag exists)
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.4 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.5 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.4` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.5` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1` or `0.1.2-alpha.3` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 

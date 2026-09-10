@@ -1,5 +1,16 @@
 # Changelog
 
+## 5.1.5 (unreleased candidate)
+
+- Preserve published v5.1.4 (`72ecf169`) as the base; no rollback of its OAuth/UI fixes.
+- Correct SDK stream diagnostic termination before freeze: completed, failed, cancelled,
+  timed-out. Preserve original error identities, lease concurrency, deadlines and usage.
+- Omit unavailable SDK-owned body/event counters rather than manufacturing zero or
+  counting normalized events as wire data. Native transport diagnostics are unchanged.
+- Add fake transport/pinned SDK regressions and pair with compaction 0.4.0's optional
+  terminal-phase allowlist. No new real-provider test is claimed for this diagnostic delta.
+- No core, authentication, data migration, publication or production activation changes.
+
 ## 5.1.4 (unreleased preparation)
 
 - Combine the governance candidate, Antigravity quota-surface hotfix and the verified
