@@ -1,5 +1,43 @@
 # Changelog
 
+## 5.1.7
+
+- Adapt session import to the DSH `0.1.5-rc.1` persistence seam through a
+  versioned read adapter (`lib/session-import.js`) that selects the host's
+  complete public capability set and fails closed otherwise: 0.1.5's
+  `list()` + `open(id, 'read')` handle path (top-level `inheritedEventCount`
+  on the handle, `finally close()`), and 0.1.2's `listSnapshots()` +
+  `inspect()` — whose same-named `list()` returns bare `SessionHeader[]`
+  rows and is never mistaken for the snapshot listing (a real 0.1.2 host
+  exposes both names). Mixed or incomplete shapes raise instead of guessing
+  a row shape. The adapter always lifts the exact inherited cut onto the
+  ledger header DTO (0.1.2 inspections carry it top level; V2-era
+  `meta.seedLength` stays as a fallback); the cut is storage metadata and
+  never part of the replayable event log.
+- Ownership cut resolution (`inheritedPrefixLength`) accepts the V3
+  `inheritedEventCount` and the V2-era `seedLength` in one place across the
+  historical fold, source registration, and live ingest. A seeded fork whose
+  cut is missing fails closed (`missing-inherited-cut`) instead of defaulting
+  to zero or marking inherited usage as owned; an ordinary `parentSession`
+  subagent stays unseeded and fully owned.
+- RPC channel registration stays on the released direct
+  `ctx.connection.rpc.handle(...)` path: in both the `0.1.2-rc.1` and
+  `0.1.5-rc.1` hosts the Connection service owns channel-registration effects
+  on the service's own fiber, so no child plugin or extra `webServer` inject
+  is needed.
+- Session summaries surface `isSeeded`/`inheritedEventCount` on the live
+  capture header so seeded forks keep exact ownership during live ingest.
+- Installer accepts exactly `0.1.5-rc.1` in addition to the unchanged
+  `0.1.2-rc.1`/`0.1.2-alpha.3` support; no broad version acceptance.
+- Tests: exact owned/inherited token splits, real `JsonlSessionPersistence`
+  V0→V3 migration acceptance through the assembled plugin and RPC entries,
+  a real 0.1.2 `JsonlSessionPersistence` + apply/RPC import acceptance over
+  the host's mixed list()/listSnapshots() shape (bare-header list rows are
+  never mistaken for snapshot rows), idempotent rescans, cancel/close
+  behavior, ledger reopen recovery, and a closed failure that leaves the
+  source artifact untouched. No account, quota, credential, or
+  data-migration semantics change; no core changes.
+
 ## 5.1.6 (unreleased candidate)
 
 - Rebuild the settings provider-connections section as master-detail (B-form):

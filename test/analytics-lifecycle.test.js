@@ -79,6 +79,9 @@ function fakeCtx({ credentialValues = {} } = {}) {
       listSnapshots: async () => [{ header: session.header, revision: 'rev-1' }],
       inspect: async () => ({ meta: session.header, events: session.events }),
     },
+    // The host resolves runtime inject scopes against provided services; the
+    // stub applies them synchronously against this same scope.
+    inject: (names, callback) => { callback(ctx) },
   }
   return { ctx, eventListeners, channels, provided }
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createLedgerService } from '../lib/ledger/service.js'
+import { createLedgerService, LedgerError } from '../lib/ledger/service.js'
 
 function tempDb() {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-token-usage-test-'))
@@ -175,6 +175,49 @@ test('fork-inherited prefix (seq < seedLength) is excluded from aggregates', () 
     const forkDetail = service.getSessionDetail('fork', { timezone: 'UTC' })
     assert.equal(forkDetail.ownTotals.processingTokens, 10)
     assert.equal(forkDetail.inheritedTotals.processingTokens, 100 + 50 + 200 + 10 + 30 + 70)
+    service.dispose()
+  } finally {
+    db.cleanup()
+  }
+})
+
+test('fork-inherited prefix uses inheritedEventCount when seedLength is absent', () => {
+  const db = tempDb()
+  try {
+    const service = createLedgerService({ databasePath: db.path })
+    const parent = standardSession({ id: 'parent', cwd: '/work/repo-a' })
+    service.importSession(parent)
+    const forkEvents = [
+      ...parent.events.map((event) => ({ ...event })),
+      ...modelCall({ seq: 8, time: T0 + 2 * HOUR, turn: 2, step: 0, usage: { inputTokens: 5, outputTokens: 5 } }),
+      { type: 'step/end', seq: 10, time: T0 + 2 * HOUR + 1000, data: { turn: 2, step: 0 } },
+    ]
+    const forkHeader = {
+      version: 3, id: 'fork-v3', createdAt: T0 + 2 * HOUR, cwd: '/work/repo-a',
+      parentSession: 'parent', isSeeded: true, inheritedEventCount: 8,
+    }
+    service.importSession({ header: forkHeader, events: forkEvents })
+    const forkDetail = service.getSessionDetail('fork-v3', { timezone: 'UTC' })
+    assert.equal(forkDetail.ownTotals.processingTokens, 10)
+    assert.equal(forkDetail.inheritedTotals.processingTokens, 100 + 50 + 200 + 10 + 30 + 70)
+    service.dispose()
+  } finally {
+    db.cleanup()
+  }
+})
+
+test('fork import without inherited cut fails closed instead of marking inherited usage owned', () => {
+  const db = tempDb()
+  try {
+    const service = createLedgerService({ databasePath: db.path })
+    const parent = standardSession({ id: 'parent', cwd: '/work/repo-a' })
+    assert.throws(
+      () => service.importSession({
+        header: { version: 3, id: 'fork-missing', createdAt: T0, cwd: '/work/repo-a', parentSession: 'parent', isSeeded: true },
+        events: parent.events,
+      }),
+      (error) => error instanceof LedgerError && error.code === 'missing-inherited-cut',
+    )
     service.dispose()
   } finally {
     db.cleanup()

@@ -132,6 +132,20 @@ test('first/repeat install and uninstall use exact public argv and preserve unre
   ])
 })
 
+test('exact 0.1.5-rc.1 CLI uses the same public transaction without broad version acceptance', (t) => {
+  const f = fixture(t)
+  const env = { FAKE_VERSION: '0.1.5-rc.1' }
+  ok(f.run(['status'], env))
+  assert.equal(existsSync(f.home), false)
+  ok(f.run([], env))
+  const installed = f.raw()
+  ok(f.run(['install'], env))
+  assert.equal(f.raw(), installed)
+  ok(f.run(['uninstall'], env))
+  ok(f.run(['uninstall'], env))
+  assert.equal(mutations(f).length, 2)
+})
+
 test('public CLI initializes absent profile; installer normalizes explicit relative links', (t) => {
   const f = fixture(t)
   ok(f.run(['--profile', 'sandbox_1', '--source', 'link:./local plugin']))

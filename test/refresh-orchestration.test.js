@@ -66,6 +66,9 @@ function fakeCtx({ credentialValues = {} } = {}) {
       listSnapshots: async () => [],
       inspect: async () => { throw new Error('no sessions in this fixture') },
     },
+    // The host resolves runtime inject scopes against provided services; the
+    // stub applies them synchronously against this same scope.
+    inject: (names, callback) => { callback(rawCtx) },
   }
   return { ctx: rawCtx, eventListeners, channels }
 }

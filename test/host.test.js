@@ -72,6 +72,10 @@ function fakeCtx({ credentialValues = {}, settingsValue = {} } = {}) {
       // error while the tests stayed green.
       inspect: async () => ({ meta: session.header, events: session.events }),
     },
+    // The host resolves runtime inject scopes against provided services; the
+    // stub applies them synchronously against this same scope, so the
+    // recorded channels stay exactly what the assertions read.
+    inject: (names, callback) => { callback(ctx) },
   }
   // Cordis only exposes declared services through ctx. Plugin row config is
   // passed separately as apply(ctx, config), so reading ctx.config must fail.
