@@ -74,19 +74,19 @@ comparison 34 + account 266 + paired 17）全绿；最终打包检查与发布 t
 ## 安装（tag 存在后）
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.7` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1`、`0.1.2-alpha.3` 或 `0.1.5-rc.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.8` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1`、`0.1.2-alpha.3` 或 `0.1.5-rc.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 

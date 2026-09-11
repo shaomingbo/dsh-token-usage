@@ -40,6 +40,7 @@ function syntheticSession(id) {
 function fakeCtx({ credentialValues = {}, settingsValue = {} } = {}) {
   const eventListeners = new Map()
   const channels = new Map()
+  const fetchRoutes = []
   const intervals = []
   const provided = new Map()
   const session = syntheticSession('s1')
@@ -64,6 +65,9 @@ function fakeCtx({ credentialValues = {}, settingsValue = {} } = {}) {
       rpc: {
         handle: (channel, handler, options) => { channels.set(channel, { handler, options }) },
       },
+      fetch: {
+        register: (route) => { fetchRoutes.push(route) },
+      },
     },
     sessionPersistence: {
       listSnapshots: async () => [{ header: session.header, revision: 'rev-1' }],
@@ -85,7 +89,7 @@ function fakeCtx({ credentialValues = {}, settingsValue = {} } = {}) {
       return Reflect.get(target, property, receiver)
     },
   })
-  return { ctx, eventListeners, channels, intervals, provided }
+  return { ctx, eventListeners, channels, fetchRoutes, intervals, provided }
 }
 
 async function settle(ms = 60) {
@@ -403,6 +407,38 @@ test('apply imports history, serves the loopback channel, and folds live events'
     // Unknown endpoints fail with a schema-legal envelope.
     const unknown = await channel.handler('bogus', {})
     assert.equal(unknown.ok, false)
+  } finally {
+    cleanup()
+    delete process.env.DSH_HOME
+  }
+})
+
+test('registers /api Fetch routes for 0.1.5 browser transport alongside loopback channels', async () => {
+  const { home, cleanup } = tempHome()
+  process.env.DSH_HOME = home
+  try {
+    const { ctx, channels, fetchRoutes, eventListeners } = fakeCtx()
+    apply(ctx, { dataDir: join(home, 'data') })
+    await settle(80)
+    assert.ok(channels.has('/token-usage'))
+    assert.ok(channels.has('/account-usage'))
+    const paths = fetchRoutes.map((route) => route.path)
+    assert.ok(paths.includes('/api/token-usage/overview'))
+    assert.ok(paths.includes('/api/token-usage/query'))
+    assert.ok(paths.includes('/api/account-usage/summary'))
+    assert.ok(paths.includes('/api/subscription-antigravity/accounts'))
+    const overview = fetchRoutes.find((route) => route.path === '/api/token-usage/overview')
+    assert.deepEqual(overview.methods, ['POST'])
+    const response = await overview.fetch(new Request('http://dsh.internal/api/token-usage/overview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ type: 'client-request', rpcId: 't1', method: 'token-usage/overview', payload: {} }),
+    }))
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(body.type, 'server-response')
+    assert.equal(body.result.ok, true)
+    eventListeners.get('dispose')?.()
   } finally {
     cleanup()
     delete process.env.DSH_HOME

@@ -94,19 +94,19 @@ not been shown to cancel it. Persistent upstream failures and hard context limit
 ## Install (after the tag exists)
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.7 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.7` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1`, `0.1.2-alpha.3`, or `0.1.5-rc.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.8` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1`, `0.1.2-alpha.3`, or `0.1.5-rc.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 
