@@ -1,5 +1,34 @@
 # Changelog
 
+## 5.1.9
+
+- Fix the Antigravity official-allowance display for consumer accounts whose
+  quota surfaces disagree (verified live 2026-09-13). `fetchAvailableModels`
+  no longer stops at the first answering surface: it walks the quota surfaces
+  in turn and merges quota facts — the first answer owns the catalog and
+  every field it reports, later answers only fill omitted
+  `remainingFraction`/`resetTime`, and the walk stops as soon as every entry
+  reports a numeric fraction (a complete answer still costs exactly one
+  request). This restores the real gemini percentages on accounts where
+  daily answers gemini rows without `remainingFraction` while prod still
+  carries the true fractions with the same fixed reset instant.
+- Detect the upstream placeholder echo in the usage layer instead of
+  persisting it as a fact: a row with `remainingFraction` exactly 1 whose
+  reset instant sits within two minutes of the model-read time+5h is treated
+  as the per-request placeholder echo observed on the claude-*/gpt-oss rows
+  of every surface (a heuristic backed by current live accounts, not a
+  protocol guarantee), so both the fraction and the reset time are recorded
+  as unknown and the client renders an honest '—' without the
+  never-converging ~5h countdown. A genuinely full quota whose reset does
+  not sit at the echo instant is kept as before. The echo comparison uses
+  the instant of the models read itself, so slow auth/discovery/summary
+  steps cannot push a real echo past the tolerance window.
+- Merge quota fills never shadow a model's own quota shape: a model that
+  carries its quota fields flat (no `quotaInfo` object) only adopts a
+  fallback surface's `quotaInfo` when it has no quota fields of its own.
+- Record `fetchedAt` on the usage payload so persisted observations carry the
+  read instant instead of falling back to persist time.
+
 ## 5.1.7
 
 - Adapt session import to the DSH `0.1.5-rc.1` persistence seam through a
