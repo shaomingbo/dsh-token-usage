@@ -134,7 +134,7 @@ npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --profile we
 npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --help
 ```
 
-`--profile` defaults to `web`. `--source` defaults to the version-derived fixed `v5.1.8` tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1`, `0.1.2-alpha.3`, or `0.1.5-rc.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
+`--profile` defaults to `web`. `--source` defaults to the version-derived fixed tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1`, `0.1.2-alpha.3`, `0.1.5-rc.1`, or `0.1.7-alpha.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
 
 ### Local development
 

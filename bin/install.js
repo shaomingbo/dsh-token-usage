@@ -14,7 +14,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const PACKAGE_NAME = 'dsh-token-usage'
-export const SUPPORTED_DSH_VERSIONS = Object.freeze(['0.1.2-rc.1', '0.1.2-alpha.3', '0.1.5-rc.1'])
+export const SUPPORTED_DSH_VERSIONS = Object.freeze(['0.1.2-rc.1', '0.1.2-alpha.3', '0.1.5-rc.1', '0.1.7-alpha.1'])
 export const SUPPORTED_DSH_VERSION = SUPPORTED_DSH_VERSIONS[0]
 // Default source derives from this package's own version so the pinned tag can
 // never drift behind a release again (v5.0.23 shipped pinned to v5.0.22).

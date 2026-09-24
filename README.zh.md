@@ -97,7 +97,7 @@ npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --profile we
 npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --help
 ```
 
-`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 `v5.1.8` tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1`、`0.1.2-alpha.3` 或 `0.1.5-rc.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
+`--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1`、`0.1.2-alpha.3`、`0.1.5-rc.1` 或 `0.1.7-alpha.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
 
 ### 本地开发
 

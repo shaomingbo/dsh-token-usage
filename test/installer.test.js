@@ -305,3 +305,7 @@ test('rejects redirected profile directories before invoking mutations', t => {
   assert.deepEqual(readdirSync(target), [])
   assert.deepEqual(mutations(f), [])
 })
+test('default source tracks package version (N1 identity guard)', () => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  assert.equal(DEFAULT_SOURCE, `github:shaomingbo/dsh-token-usage#v${pkg.version}`)
+})

@@ -21,7 +21,7 @@ test('package manifest follows the bundle conventions', async () => {
   assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-slots'))
   assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-renderer'))
   assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-api-remotes'))
-  assert.equal(manifest.peerDependencies['@deepseek-ai/dsh-llm'], '0.1.7-alpha.1')
+  assert.equal(manifest.peerDependencies, undefined, 'host packages are provided by the DSH profile runtime, not npm peers (npx auto-resolution caused ERESOLVE); compatibility is gated by the installer dsh CLI matrix')
   assert.ok(!manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-runtime'))
   for (const file of ['bin/install.js', 'cordis.patch.yml', 'lib', 'README.md', 'README.zh.md', 'LICENSE']) {
     assert.ok(manifest.files.includes(file), `files must ship ${file}`)
