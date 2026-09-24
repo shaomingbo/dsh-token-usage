@@ -1,0 +1,25 @@
+# Isolated 0.1.7-alpha.1 compatibility fixtures; never float to alpha.2 peers.
+minimumReleaseAge: 0
+overrides:
+  '@deepseek-ai/cordis': 4.0.3
+  '@deepseek-ai/cosmokit': 1.8.4
+  '@deepseek-ai/dsh-agent': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-attachment': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-brand': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-commands': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-compaction': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-compaction-image-offload': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-invariants': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-llm': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-llm-retry': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-scope': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-session': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-session-projection': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-system-prompt': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-timeout': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-token-meter': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-typert-protocol': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-util-crypto': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-util-values': 0.1.7-alpha.1
+  '@deepseek-ai/dsh-workspace': 0.1.7-alpha.1
+storeDir: ../../../../development/555bd5f20c25d91354772277754b9de1983aeb958d6c748f3bfd2a824c84c343/cache/pnpm-store

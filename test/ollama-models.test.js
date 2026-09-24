@@ -2,20 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { OllamaCloudModels } from '../lib/accounts/ollama-models.js'
 
-function settingsFixture(value = {}) {
-  return {
-    value: structuredClone(value),
-    get(namespace) { return this.value[namespace] },
-    async update(namespace, patch) {
-      const current = this.value[namespace] ?? {}
-      this.value[namespace] = {
-        ...current,
-        ...patch,
-        providers: { ...(current.providers ?? {}), ...(patch.providers ?? {}) },
-      }
-    },
-  }
-}
+import { settingsFixture } from './settings-fixture.js'
 
 function jsonResponse(body, url, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -161,6 +148,27 @@ test('a failed detail request keeps the listed model and does not erase its last
     { id: 'kept', name: 'Kept', contextWindow: 131072, maxTokens: 4096, input: ['text', 'image'], reasoningEfforts: { high: 'high' } },
     { id: 'new-model', name: 'new-model', input: ['text'], reasoningEfforts: false },
   ])
+})
+
+test('catalog sync preserves redacted model secrets through leaf edits', async () => {
+  const settings = settingsFixture({ 'llm-pi-ai': { providers: { 'ollama-cloud': {
+    apiKeyEnv: 'OLLAMA_API_KEY', api: 'openai-completions', baseURL: 'https://ollama.com/v1',
+    models: [{ id: 'retired' }, { id: 'kept', headers: { authorization: 'fixture-secret' } }],
+  } } } })
+  const describe = settings.forms.describe.bind(settings.forms)
+  settings.forms.describe = options => {
+    const rows = structuredClone(describe(options))
+    for (const model of rows[0].value.providers['ollama-cloud'].models) delete model.headers
+    return rows
+  }
+  const fetch = async url => String(url).endsWith('/tags')
+    ? jsonResponse({ models: [{ model: 'kept' }, { model: 'new-model' }] })
+    : jsonResponse({ capabilities: ['completion'] })
+  await new OllamaCloudModels({ fetch, settings }).sync({ apiKey: 'test-secret' })
+  const models = settings.value['llm-pi-ai'].providers['ollama-cloud'].models
+  assert.deepEqual(models.map(model => model.id), ['kept', 'new-model'])
+  assert.equal(models[0].headers.authorization, 'fixture-secret')
+  assert.ok(settings.forms.calls[0].ops.every(op => !(op.op === 'set' && op.path.at(-1) === 'models')))
 })
 
 test('caller cancellation is preserved and never replaces the existing catalog', async () => {

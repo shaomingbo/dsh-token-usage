@@ -67,6 +67,8 @@ function fixture(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }))
   const bin = join(root, 'bin')
   mkdirSync(bin)
+  // Fixtures may live beneath an ESM worktree TMPDIR; fake CLI is CommonJS.
+  writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'commonjs' }))
   writeFileSync(join(bin, 'dsh'), fake)
   chmodSync(join(bin, 'dsh'), 0o755)
   const home = join(root, 'home')

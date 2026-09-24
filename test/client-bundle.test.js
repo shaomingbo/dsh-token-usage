@@ -868,6 +868,12 @@ function createHookHarness({ controlled = [], responses = new Map() } = {}) {
   const rpcCalls = []
   const pendingByEndpoint = new Map()
   const call = (channel, endpoint, payload) => {
+    // Exercise the current /api path while keeping logical-channel fixtures.
+    if (channel === '/api') {
+      const [owner, ...parts] = endpoint.split('/')
+      channel = `/${owner}`
+      endpoint = parts.join('/')
+    }
     rpcCalls.push({ channel, endpoint, payload })
     const key = `${channel}:${endpoint}`
     if (controlled.includes(key)) {

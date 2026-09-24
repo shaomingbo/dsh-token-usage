@@ -19,6 +19,9 @@ test('package manifest follows the bundle conventions', async () => {
   assert.equal(manifest.dsh.client.platform, 'web')
   assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-connection'))
   assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-slots'))
+  assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-renderer'))
+  assert.ok(manifest.dsh.client.inject.includes('@deepseek-ai/dsh-api-remotes'))
+  assert.equal(manifest.peerDependencies['@deepseek-ai/dsh-llm'], '0.1.7-alpha.1')
   assert.ok(!manifest.dsh.client.inject.includes('@deepseek-ai/dsh-client-runtime'))
   for (const file of ['bin/install.js', 'cordis.patch.yml', 'lib', 'README.md', 'README.zh.md', 'LICENSE']) {
     assert.ok(manifest.files.includes(file), `files must ship ${file}`)
@@ -27,10 +30,12 @@ test('package manifest follows the bundle conventions', async () => {
   assert.ok(manifest.repository.url.includes('shaomingbo/dsh-token-usage'))
 })
 
-test('the bundle patch only inserts its own row', async () => {
+test('the bundle adds only its row and the Connection owner injection compatibility patch', async () => {
   const patch = await readFile(new URL('cordis.patch.yml', root), 'utf8')
   assert.match(patch, /- insert:/)
   assert.match(patch, /- id: dsh-token-usage/)
   assert.match(patch, /name: dsh-token-usage/)
-  assert.ok(!/- id: (?!dsh-token-usage)/.test(patch), 'must not touch other rows')
+  assert.ok(!/- id: (?!(?:dsh-token-usage|connection)\b)/.test(patch), 'must not touch unrelated rows')
+  assert.match(patch, /- id: connection\n  inject: \[webRuntime, webServer\]\n/)
+  assert.ok(!/^\s*config:/m.test(patch), 'must preserve host-owned Connection config and trust policy')
 })

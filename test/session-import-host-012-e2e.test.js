@@ -189,6 +189,7 @@ function startRuntime() {
     },
   })
   root.provide('credentials', makeCredentialsStub())
+  root.provide('llm', { listConfigurableProviders: () => [] })
   root.provide('settings', {
     get() { return null },
     async update(_key, patch) { return patch },

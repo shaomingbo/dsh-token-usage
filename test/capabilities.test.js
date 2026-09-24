@@ -16,6 +16,7 @@ import {
   antigravityRouteNeedsProvisioning,
   ensureAntigravityRoute,
 } from '../lib/capabilities/antigravity/capability.js'
+import { settingsFixture } from './settings-fixture.js'
 import { OwnerFileStore } from '../lib/capabilities/owner-file-store.js'
 import { createCapabilityEnvelope } from '../lib/capabilities/rpc-envelope.js'
 
@@ -98,23 +99,17 @@ test('Antigravity route patch keeps user models while repairing owned connectivi
   assert.equal(antigravityRouteNeedsProvisioning({ ...patch, connectionIdHeader: 'x-dsh-connection-id' }, proxyUrl), true)
 })
 
-test('Antigravity route provisioning removes the obsolete core-only header field', async () => {
+test('Antigravity provisioning warns instead of mutating an obsolete non-schema header field', async () => {
   const proxyUrl = 'http://127.0.0.1:51122/v1'
   const existing = {
     ...antigravityRoutePatch({}, proxyUrl),
     connectionIdHeader: 'x-dsh-connection-id',
   }
-  const calls = []
-  const settings = {
-    get: () => ({ providers: { antigravity: existing } }),
-    mutate: async (namespace, ops) => { calls.push(['mutate', namespace, ops]) },
-    update: async (namespace, patch) => { calls.push(['update', namespace, patch]) },
-  }
-  assert.equal(await ensureAntigravityRoute(settings, proxyUrl), true)
-  assert.deepEqual(calls[0], ['mutate', 'llm-pi-ai', [{
-    op: 'unset', path: ['providers', 'antigravity', 'connectionIdHeader'],
-  }]])
-  assert.equal('connectionIdHeader' in calls[1][2].providers.antigravity, false)
+  const settings = settingsFixture({ 'llm-pi-ai': { providers: { antigravity: existing } } })
+  const warnings = []
+  assert.equal(await ensureAntigravityRoute(settings, proxyUrl, { warn: text => warnings.push(text) }), false)
+  assert.equal(settings.forms.calls.length, 0)
+  assert.match(warnings[0], /explicit profile cleanup/)
 })
 
 test('Antigravity proxy identifies the final connection on a successful completion', async t => {

@@ -1,5 +1,16 @@
 # DSH Accounts & Usage
 
+## 5.2.1 — DSH 0.1.7-alpha.1 适配候选
+
+本候选基于已发布 0.1.7-alpha.1 契约；尚未通过真实宿主启动、GUI、OAuth 或部署验收。下文旧版兼容说明为历史证据，不代表 5.2.1 兼容承诺。旧安装器尚未适配 single-root CLI，仍明确拒绝该版本，不用于本候选部署。
+
+provider directory → redacted SettingsForms → 带 revision 的叶路径写入；无目录/volatile 表单时告警降级，不猜 entry id。首次自定义 route 需先由用户在对应 adapter 声明；启动不覆盖用户已有 ChatGPT credential ref。插件自有 OAuth refresh/ref 同步、`codex-runtime/v1` 与 `authOwner=dsh-token-usage` 保持不变；官方 flow/route 争用、Connection 逐路由认证仍待 MRV。
+
+账本按 V4 durable assistant settlement 区分 attempt，覆盖重试、失败与取消。schema11 将旧 step 行及 correction 保留在 attempt=0；新 attempt 使用 durable seq 标识。旧 step/V4 数据重叠时拒绝重复导入，需单独授权协调。测试只用合成临时库，没有迁移用户真实账本。
+
+默认沿用 `<DSH_HOME>/dsh-token-usage`；显式 `config.profile`/`DSH_PROFILE` 可选旧 `profiles/<id>/data/dsh-token-usage`，或配置 `dataDir`。不再从 cwd、模块位置或单个已安装 bundle 猜 profile；存在未明确归属的旧目录则告警，不移库、不合库，也不静默新建空替代库。
+
+
 ## 5.1.6 账户面板重构（未发布候选）
 
 设置页「提供方连接与模型来源」改为主从双栏：每个来源一项（Antigravity 账户池合并为单项，池内管理轮转——设为当前/移除/添加账户/自动轮转开关），详情复用既有的连接控件且只读事实（C-001 保持）。缓存模型目录随 Ollama Cloud 详情展示；Ollama Local 无账户面，不再出现在面板中。凭据写入走宿主 api-remotes 凭据命名空间（与宿主 Models 页同一契约）。关闭弹窗后未完成的 Antigravity 授权可在池详情重挂恢复。侧栏底部与 dock 行使用同一窗口选择规则（★ 窗口优先，否则最紧窗）。330 个测试通过；无新增真实提供方验收；树内容为 v5.1.5 tag 的严格超集。

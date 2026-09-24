@@ -3,3 +3,4 @@ node_modules
 *.sqlite-*
 data/
 .DS_Store
+.migration-tmp/

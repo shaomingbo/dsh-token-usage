@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, realpathSync, symlinkSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { settingsFixture } from './settings-fixture.js'
 import {
   ACCOUNT_USAGE_PROTOCOL,
   ACCOUNT_USAGE_SERVICE,
@@ -44,6 +45,7 @@ function fakeCtx({ credentialValues = {}, settingsValue = {} } = {}) {
   const intervals = []
   const provided = new Map()
   const session = syntheticSession('s1')
+  const providerSettings = settingsFixture(settingsValue)
   const rawCtx = {
     logger: { error() {}, warn() {}, info() {} },
     on: (event, listener) => { eventListeners.set(event, listener) },
@@ -54,16 +56,11 @@ function fakeCtx({ credentialValues = {}, settingsValue = {} } = {}) {
       resolve: async ref => typeof credentialValues[ref] === 'string' ? { value: credentialValues[ref] } : undefined,
       set: async (ref, value) => { credentialValues[ref] = value },
     },
-    settings: {
-      value: structuredClone(settingsValue),
-      get(key) { return this.value[key] },
-      async update(key, patch) {
-        this.value[key] = { ...(this.value[key] ?? {}), ...patch, providers: { ...(this.value[key]?.providers ?? {}), ...(patch.providers ?? {}) } }
-      },
-    },
+    settings: providerSettings.forms,
+    llm: providerSettings.llm,
     connection: {
       rpc: {
-        handle: (channel, handler, options) => { channels.set(channel, { handler, options }) },
+        handle: (...args) => { assert.equal(args.length, 2); const [channel, handler] = args; channels.set(channel, { handler }) },
       },
       fetch: {
         register: (route) => { fetchRoutes.push(route) },
@@ -202,7 +199,7 @@ test('data dir resolves inside the profile when installed conventionally', () =>
     const modulePath = join(env.home, 'profiles', 'web', 'node_modules', 'dsh-token-usage', 'lib', 'index.js')
     mkdirSync(join(modulePath, '..'), { recursive: true })
     writeFileSync(modulePath, '// marker\n')
-    const dir = resolveDataDir({ moduleUrl: pathToFileURL(modulePath), home: env.home })
+    const dir = resolveDataDir({ moduleUrl: pathToFileURL(modulePath), home: env.home, profile: 'web' })
     assert.equal(dir, join(env.home, 'profiles', 'web', 'data', 'dsh-token-usage'))
   } finally {
     env.cleanup()
@@ -220,7 +217,7 @@ test('data dir follows the profile even when the plugin is a symlink to a checko
     symlinkSync(checkout, linkedRoot)
     const dir = resolveDataDir({
       moduleUrl: pathToFileURL(join(linkedRoot, 'lib', 'index.js')),
-      home: env.home,
+      home: env.home, profile: 'web',
     })
     assert.equal(dir, join(env.home, 'profiles', 'web', 'data', 'dsh-token-usage'))
   } finally {
@@ -228,7 +225,7 @@ test('data dir follows the profile even when the plugin is a symlink to a checko
   }
 })
 
-test('data dir uses the profile that bundles the plugin, never the home-level fallback', () => {
+test('a fresh bundled home adopts the home-level store; nothing is moved', () => {
   const env = tempHome()
   try {
     mkdirSync(join(env.home, 'profiles', 'web'), { recursive: true })
@@ -236,8 +233,11 @@ test('data dir uses the profile that bundles the plugin, never the home-level fa
       dependencies: { 'dsh-token-usage': 'link:../..' },
       dsh: { profile: { bundles: ['dsh-token-usage'] } },
     }))
-    const dir = resolveDataDir({ moduleUrl: import.meta.url, home: env.home, cwd: env.home })
-    assert.equal(dir, join(env.home, 'profiles', 'web', 'data', 'dsh-token-usage'))
+    const dir = resolveDataDir({ moduleUrl: import.meta.url, home: env.home, cwd: env.home, env: {} })
+    // Fresh single-root home with no store anywhere: the home-level directory
+    // is the writable default; the profile's data dir stays untouched.
+    assert.equal(dir, join(env.home, 'dsh-token-usage'))
+    assert.equal(existsSync(join(env.home, 'profiles', 'web', 'data')), false)
   } finally {
     env.cleanup()
   }
@@ -281,11 +281,11 @@ test('apply imports history, serves the loopback channel, and folds live events'
     // The channel is loopback-only.
     const channel = channels.get('/token-usage')
     assert.ok(channel, 'token-usage channel missing')
-    assert.equal(channel.options.authority, 'loopback')
+    assert.equal(channel.handler.length, 4)
     assert.equal(channels.has('/subscription-search'), false, 'SearchChain retains exclusive ownership')
-    assert.equal(channels.get('/subscription-antigravity')?.options.authority, 'loopback')
+    assert.equal(channels.get('/subscription-antigravity')?.handler.length, 4)
     const accountChannel = channels.get('/account-usage')
-    assert.equal(accountChannel?.options.authority, 'loopback')
+    assert.equal(accountChannel?.handler.length, 4)
     const accountUsage = provided.get(ACCOUNT_USAGE_SERVICE)
     assert.equal(accountUsage?.protocol, ACCOUNT_USAGE_PROTOCOL)
     assert.equal((await accountUsage.list()).privacy.secretsInRpc, false)

@@ -1,6 +1,6 @@
 {
   "name": "dsh-token-usage",
-  "version": "5.1.9",
+  "version": "5.2.1",
   "description": "DSH Accounts & Usage: unified provider connections, official allowance observations, a separate local usage ledger, and the owner-bound codex-runtime/v1 native capability. No telemetry, prompts, or secrets in SQLite/RPC/log/export.",
   "type": "module",
   "main": "lib/index.js",
@@ -39,7 +39,9 @@
       "inject": [
         "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-slots"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-api-remotes"
       ],
       "platform": "web"
     }
@@ -65,6 +67,13 @@
   "license": "MIT",
   "engines": {
     "node": ">=22.19.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-llm": "0.1.7-alpha.1"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-token-meter": "0.1.7-alpha.1",
+    "@deepseek-ai/dsh-llm": "0.1.7-alpha.1"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.82.1",

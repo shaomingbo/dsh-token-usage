@@ -1,4 +1,6 @@
 import test from 'node:test'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -10,6 +12,29 @@ function tempDir() {
   const dir = mkdtempSync(join(tmpdir(), 'dsh-token-usage-mig-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
+
+test('schema11 preserves actual baseline v10 requests and correction identities at attempt zero', async () => {
+  const source = execFileSync('git', ['show', 'a439ba94501d7d0277c3f3847d94d7e1d4498633:lib/ledger/db.js'], { cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8' })
+  const legacyModule = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+  const env = tempDir()
+  try {
+    const path = join(env.dir, 'baseline.sqlite')
+    const legacy = legacyModule.openDatabase(path)
+    legacy.exec(`INSERT INTO requests(session_id,turn,step,seq,time,status,input_tokens) VALUES('old',0,0,1,1000,'ok',42);
+      INSERT INTO request_corrections(session_id,turn,step,input_tokens,excluded,active,created_at) VALUES('old',0,0,43,0,1,1001);`)
+    legacy.close()
+    const current = openDatabase(path)
+    try {
+      assert.equal(current.prepare('SELECT attempt FROM requests').get().attempt, 0)
+      assert.equal(current.prepare('SELECT input_tokens, attempt FROM request_corrections').get().input_tokens, 43)
+      assert.equal(current.prepare('SELECT attempt FROM request_corrections').get().attempt, 0)
+      assert.deepEqual(current.prepare('PRAGMA foreign_key_check').all(), [])
+      current.exec("INSERT INTO requests(session_id,turn,step,attempt,seq,time) VALUES('old',0,0,5,4,1002)")
+      assert.equal(current.prepare('SELECT COUNT(*) AS count FROM requests').get().count, 2)
+      assert.ok(existsSync(`${path}.pre-migration`))
+    } finally { current.close() }
+  } finally { env.cleanup() }
+})
 
 test('fresh databases open at the current schema version', () => {
   const env = tempDir()

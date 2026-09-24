@@ -6,10 +6,10 @@ import { createCodexRuntime } from '../lib/capabilities/codex-native/runtime.js'
 const REF = 'OPENAI_CODEX_ACCESS_TOKEN';
 const astraProfile = { id: 'gpt-6-astra', contextWindow: 872000, maxTokens: 128000, input: ['text', 'image'],
   reasoningEfforts: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' } };
-const settings = route => () => ({ providers: { 'openai-codex': route } });
+const settings = route => () => route;
 
 test('official route verdicts are fixed-vocabulary and credential-ref bound', () => {
-  const facts = createCodexModelFacts({ getSettings: settings({ apiKeyEnv: REF }), credentialRef: REF });
+  const facts = createCodexModelFacts({ getRoute: settings({ apiKeyEnv: REF }), credentialRef: REF });
   assert.deepEqual(facts.routeStatus(), { ok: true, route: { apiKeyEnv: REF } });
   assert.equal(facts.routeStatus().route.baseURL, undefined);
   for (const [route, reason] of [
@@ -17,16 +17,16 @@ test('official route verdicts are fixed-vocabulary and credential-ref bound', ()
     [{ apiKeyEnv: REF, api: 'openai-responses' }, 'ROUTE_PROTOCOL'],
     [{ apiKeyEnv: REF, baseURL: 'https://evil.invalid/v1' }, 'ROUTE_ENDPOINT'],
   ]) {
-    assert.equal(createCodexModelFacts({ getSettings: settings(route), credentialRef: REF }).routeStatus().reason, reason);
+    assert.equal(createCodexModelFacts({ getRoute: settings(route), credentialRef: REF }).routeStatus().reason, reason);
   }
-  assert.equal(createCodexModelFacts({ getSettings: () => undefined, credentialRef: REF }).routeStatus().reason, 'ROUTE_MISSING');
-  const base = createCodexModelFacts({ getSettings: settings({ apiKeyEnv: REF, baseURL: facts.OFFICIAL_CODEX_BASE }), credentialRef: REF });
+  assert.equal(createCodexModelFacts({ getRoute: () => undefined, credentialRef: REF }).routeStatus().reason, 'ROUTE_MISSING');
+  const base = createCodexModelFacts({ getRoute: settings({ apiKeyEnv: REF, baseURL: facts.OFFICIAL_CODEX_BASE }), credentialRef: REF });
   assert.equal(base.routeStatus().ok, true, 'the explicit official base is accepted');
 });
 
 test('profile facts are whitelisted; unknown fields never cross the seam', async () => {
   const facts = createCodexModelFacts({
-    getSettings: settings({ apiKeyEnv: REF, models: [{ ...astraProfile, headers: { authorization: 'Bearer SECRET' }, baseURL: 'https://evil.invalid', compat: { strict: true }, extraJunk: true }] }),
+    getRoute: settings({ apiKeyEnv: REF, models: [{ ...astraProfile, headers: { authorization: 'Bearer SECRET' }, baseURL: 'https://evil.invalid', compat: { strict: true }, extraJunk: true }] }),
     credentialRef: REF,
   });
   const resolved = await facts.resolveModelFacts('gpt-6-astra');
@@ -41,19 +41,19 @@ test('profile facts are whitelisted; unknown fields never cross the seam', async
 
 test('host-resolved info cross-checks instead of trusting either side blindly', async () => {
   const agree = createCodexModelFacts({
-    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-6-astra', maxTokens: 128000 }] }),
+    getRoute: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-6-astra', maxTokens: 128000 }] }),
     resolveModelInfo: async () => ({ context: { contextWindow: 872000 }, defaultMaxTokens: 128000, inputModalities: ['text', 'image'] }),
     credentialRef: REF,
   });
   assert.deepEqual(await agree.resolveModelFacts('gpt-6-astra'), { id: 'gpt-6-astra', contextWindow: 872000, maxTokens: 128000, input: ['text', 'image'] });
   const conflict = createCodexModelFacts({
-    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-6-astra', contextWindow: 872000 }] }),
+    getRoute: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-6-astra', contextWindow: 872000 }] }),
     resolveModelInfo: async () => ({ context: { contextWindow: 272000 } }),
     credentialRef: REF,
   });
   assert.deepEqual(await conflict.resolveModelFacts('gpt-6-astra'), { gap: 'METADATA_CONFLICT' });
   const failing = createCodexModelFacts({
-    getSettings: settings({ apiKeyEnv: REF, models: [astraProfile] }),
+    getRoute: settings({ apiKeyEnv: REF, models: [astraProfile] }),
     resolveModelInfo: async () => { throw new Error('SECRET-RESOLVE-FAILURE'); },
     credentialRef: REF,
   });
@@ -68,15 +68,15 @@ test('invalid profile values are concrete gaps, never coerced or invented', asyn
     [{ id: 'gpt-6-astra', contextWindow: 1, maxTokens: Number.NaN }, 'PROFILE_INVALID'],
     [{ id: 'gpt-6-astra', name: 'x'.repeat(300), contextWindow: 1, maxTokens: 1 }, 'PROFILE_INVALID'],
   ]) {
-    const facts = createCodexModelFacts({ getSettings: settings({ apiKeyEnv: REF, models: [entry] }), credentialRef: REF });
+    const facts = createCodexModelFacts({ getRoute: settings({ apiKeyEnv: REF, models: [entry] }), credentialRef: REF });
     assert.deepEqual(await facts.resolveModelFacts('gpt-6-astra'), { gap });
   }
-  const none = createCodexModelFacts({ getSettings: settings({ apiKeyEnv: REF, models: [] }), credentialRef: REF });
+  const none = createCodexModelFacts({ getRoute: settings({ apiKeyEnv: REF, models: [] }), credentialRef: REF });
   assert.equal(await none.resolveModelFacts('gpt-6-astra'), undefined, 'an unconfigured id is unknown, not a metadata gap');
 });
 
 test('gap passthrough carries the route verdict for inapplicable routes', async () => {
-  const facts = createCodexModelFacts({ getSettings: settings({ apiKeyEnv: 'OTHER_REF', models: [astraProfile] }), credentialRef: REF });
+  const facts = createCodexModelFacts({ getRoute: settings({ apiKeyEnv: 'OTHER_REF', models: [astraProfile] }), credentialRef: REF });
   assert.deepEqual(await facts.resolveModelFacts('gpt-6-astra'), { gap: 'ROUTE_AUTH' });
 });
 
@@ -86,7 +86,7 @@ test('a schema-materialized empty input array inherits the host default; only no
   // cross-plugin suite). The public PiAiModelProfile contract says absent OR
   // empty both inherit the catalog/host default.
   const inherited = createCodexModelFacts({
-    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', reasoningEfforts: { low: 'low' }, input: [] }] }),
+    getRoute: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', reasoningEfforts: { low: 'low' }, input: [] }] }),
     resolveModelInfo: async () => ({ context: { contextWindow: 272000 }, inputModalities: ['text', 'image'] }),
     credentialRef: REF,
   });
@@ -95,7 +95,7 @@ test('a schema-materialized empty input array inherits the host default; only no
     'an empty materialized input array falls back to the host-resolved modalities');
 
   const withoutHost = createCodexModelFacts({
-    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', contextWindow: 272000, maxTokens: 128000, input: [] }] }),
+    getRoute: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', contextWindow: 272000, maxTokens: 128000, input: [] }] }),
     credentialRef: REF,
   });
   assert.deepEqual(await withoutHost.resolveModelFacts('gpt-5.6-sol'),
@@ -105,7 +105,7 @@ test('a schema-materialized empty input array inherits the host default; only no
   // Nonempty illegal modalities stay fail-closed: they are passed to the
   // runtime, whose customModel validation rejects them.
   const illegal = createCodexModelFacts({
-    getSettings: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', input: ['video'] }] }),
+    getRoute: settings({ apiKeyEnv: REF, models: [{ id: 'gpt-5.6-sol', input: ['video'] }] }),
     resolveModelInfo: async () => ({ context: { contextWindow: 272000 }, inputModalities: ['text', 'image'] }),
     credentialRef: REF,
   });

@@ -12,6 +12,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { settingsFixture } from './settings-fixture.js'
 import {
   OBSERVATION_ROUND_TIMEOUT_MS,
   apply,
@@ -50,13 +51,8 @@ function fakeCtx({ credentialValues = {} } = {}) {
       resolve: async ref => typeof credentialValues[ref] === 'string' ? { value: credentialValues[ref] } : undefined,
       set: async (ref, value) => { credentialValues[ref] = value },
     },
-    settings: {
-      value: {},
-      get(key) { return this.value[key] },
-      async update(key, patch) {
-        this.value[key] = { ...(this.value[key] ?? {}), ...patch, providers: { ...(this.value[key]?.providers ?? {}), ...(patch.providers ?? {}) } }
-      },
-    },
+    settings: settingsFixture().forms,
+    llm: settingsFixture().llm,
     connection: {
       rpc: {
         handle: (channel, handler, options) => { channels.set(channel, { handler, options }) },

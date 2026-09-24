@@ -1,5 +1,29 @@
 # Changelog
 
+## 5.2.1
+
+- Fix the ChatGPT search backend request shape against the evolved
+  chatgpt.com/backend-api/codex/responses endpoint (verified with redacted
+  live probes 2026-09): the endpoint now forces `stream: true` ("Stream must
+  be set to true") and rejects `max_output_tokens` ("Unsupported parameter"),
+  and a correct streaming body answers 200 with an SSE responses stream whose
+  terminal `response.completed` carries an EMPTY `output` array. The codex leg
+  therefore sends the streaming shape and reads replies through a minimal SSE
+  aggregator: ordered `response.output_text.delta` joins become `content`,
+  `url_citation` annotations from `response.output_text.annotation.added` and
+  message `output_item.done` become deduplicated `sources`, and the terminal
+  event decides the outcome — `response.completed` resolves,
+  `response.incomplete` resolves as `truncated: true`, while `response.failed`,
+  a stream cut without a terminal event, or an unparseable body fail loudly
+  with a sanitized diagnostic (content-type plus the first 200 body
+  characters, bearer-style secrets scrubbed). A response that is still JSON
+  despite the streaming request — or an SSE content-type mislabeling a JSON
+  body — falls back to the original non-streaming reader, so the xai leg
+  (whose public api.x.ai API still documents `stream: false` and
+  `max_output_tokens`; endpoint behavior unverified, no Grok login in the
+  test environment) keeps its documented non-streaming shape while sharing
+  the adaptive reader.
+
 ## 5.1.9
 
 - Fix the Antigravity official-allowance display for consumer accounts whose

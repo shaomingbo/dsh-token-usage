@@ -270,6 +270,7 @@ function startRuntime() {
     },
   })
   root.provide('credentials', makeCredentialsStub())
+  root.provide('llm', { listConfigurableProviders: () => [] })
   // Host settings service contract the plugin consumes (accounts require both
   // `get` and `update` on the injected settings).
   root.provide('settings', {

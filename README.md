@@ -1,5 +1,33 @@
 # DSH Accounts & Usage
 
+## 5.2.1 — DSH 0.1.7-alpha.1 adaptation candidate
+
+This uncommitted candidate targets the published 0.1.7-alpha.1 API; GUI/startup,
+real OAuth and deployment are **not yet accepted**. Earlier compatibility notes
+below are historical, not a compatibility promise for 5.2.1. The legacy installer
+has not been certified for the new single-root CLI and intentionally rejects it.
+
+Provider configuration uses the public provider directory and redacted
+SettingsForms with revision-checked leaf edits. Missing directory entries or
+volatile forms warn and disable provisioning: declare custom routes explicitly
+in the owning adapter first. Boot never overwrites an existing ChatGPT credential
+reference. Plugin-owned OAuth refresh/ref synchronization and `codex-runtime/v1`
+(`authOwner=dsh-token-usage`) remain unchanged. Official authorization-flow
+contention and route-by-route Connection transport admission remain MRVs.
+
+V4 durable assistant settlements are accounted per attempt, including retries,
+failures and cancellation. Schema 11 retains legacy step rows/corrections at
+attempt 0; V4 IDs use the durable settlement sequence. Reimport overlapping
+legacy-step/V4 accounting fails closed pending explicit reconciliation. Tests
+use synthetic databases only; no existing user ledger has been migrated.
+
+The default store remains `<DSH_HOME>/dsh-token-usage`. Set `config.profile` or
+`DSH_PROFILE` explicitly to select an old `profiles/<id>/data/dsh-token-usage`
+store, or set `config.dataDir`. Installed profiles, cwd and module paths never
+select a profile implicitly; ambiguous legacy presence warns instead of moving,
+merging or opening an empty replacement. No automatic data migration occurs.
+
+
 ## 5.1.6 accounts panel rework (unreleased candidate)
 
 The settings provider-connections section is now master-detail: one list entry
