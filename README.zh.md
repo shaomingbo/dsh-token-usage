@@ -1,8 +1,8 @@
 # DSH Accounts & Usage
 
-## 5.2.1 — DSH 0.1.7-alpha.1 适配候选
+## 5.3.0 — DSH 0.1.7-alpha.1 适配候选
 
-本候选基于已发布 0.1.7-alpha.1 契约；尚未通过真实宿主启动、GUI、OAuth 或部署验收。下文旧版兼容说明为历史证据，不代表 5.2.1 兼容承诺。旧安装器尚未适配 single-root CLI，仍明确拒绝该版本，不用于本候选部署。
+本候选基于已发布 0.1.7-alpha.1 契约；真实宿主启动、GUI、OAuth 与部署验收为独立事项。下文旧版兼容说明为历史证据，不代表 5.3.0 兼容承诺。安装器接受安装小节列出的 CLI 版本（`0.1.2-alpha.3`、`0.1.2-rc.1`、`0.1.5-rc.1`、`0.1.7-alpha.1`）。
 
 provider directory → redacted SettingsForms → 带 revision 的叶路径写入；无目录/volatile 表单时告警降级，不猜 entry id。首次自定义 route 需先由用户在对应 adapter 声明；启动不覆盖用户已有 ChatGPT credential ref。插件自有 OAuth refresh/ref 同步、`codex-runtime/v1` 与 `authOwner=dsh-token-usage` 保持不变；官方 flow/route 争用、Connection 逐路由认证仍待 MRV。
 
@@ -85,16 +85,16 @@ comparison 34 + account 266 + paired 17）全绿；最终打包检查与发布 t
 ## 安装（tag 存在后）
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0
 ```
 
 默认安装到 `web` profile。安装后由你手动重启 DSH，并强制刷新现有 Web GUI；安装器绝不控制 DSH 进程。
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 --help
 ```
 
 `--profile` 默认是 `web`；`--source` 默认固定到随包版本派生的 tag，也可用 `DSH_TOKEN_USAGE_SOURCE` 覆盖。安装器要求 PATH 上存在 `dsh` `0.1.2-rc.1`、`0.1.2-alpha.3`、`0.1.5-rc.1` 或 `0.1.7-alpha.1`，所有变更都委托给公开 `dsh plugin` CLI 并带 `--ignore-scripts`；它核验 manifest 后置条件并如实报告失败——rc.1 不承诺回滚。`dsh` 缺失、版本不符或 plugin 命令失败时，安装器带指引地失败关闭；没有直接改 manifest 的兜底路径。
@@ -169,7 +169,7 @@ npm pack --dry-run --ignore-scripts
 
 `npm run bench:v2` 是仅开发用的分析基准，不随包发布。
 
-测试只使用合成数据和临时 `DSH_HOME`。原生能力的测试组合以原装 DSH `0.1.2-rc.1`、Node 24.18.0/macOS arm64 为目标，尚未在更低 Node 版本重跑。安装器保留既有 `0.1.2-alpha.3` 与 `0.1.2-rc.1` 两个 CLI 版本支持，拒绝其他版本；最终候选将在二者临时 home 运行安装/`--dump-config` 验证。真实验收现场启动器为 alpha.3，实际 Web/Basic 依赖为 rc.1，不能将此混合现场当作纯 alpha.3 完整原生运行兼容证据。配套压缩包仅公开支持 rc.1，不扩大范围。
+测试只使用合成数据和临时 `DSH_HOME`。原生能力的测试组合以原装 DSH `0.1.2-rc.1`、Node 24.18.0/macOS arm64 为目标，尚未在更低 Node 版本重跑。安装器支持 `0.1.2-alpha.3`、`0.1.2-rc.1`、`0.1.5-rc.1` 与 `0.1.7-alpha.1`，拒绝其他版本；最终候选将在这些版本的临时 home 运行安装/`--dump-config` 验证。真实验收现场启动器为 alpha.3，实际 Web/Basic 依赖为 rc.1，不能将此混合现场当作纯 alpha.3 完整原生运行兼容证据。配套压缩包仅公开支持 0.1.7-alpha.1，不扩大范围。
 
 ## Codex 原生能力（5.1.2）
 

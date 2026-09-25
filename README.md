@@ -1,11 +1,12 @@
 # DSH Accounts & Usage
 
-## 5.2.1 — DSH 0.1.7-alpha.1 adaptation candidate
+## 5.3.0 — DSH 0.1.7-alpha.1 adaptation candidate
 
-This uncommitted candidate targets the published 0.1.7-alpha.1 API; GUI/startup,
-real OAuth and deployment are **not yet accepted**. Earlier compatibility notes
-below are historical, not a compatibility promise for 5.2.1. The legacy installer
-has not been certified for the new single-root CLI and intentionally rejects it.
+This candidate targets the published 0.1.7-alpha.1 API; GUI/startup, real OAuth
+and deployment acceptance are separate. Earlier compatibility notes below are
+historical, not a compatibility promise for 5.3.0. The installer accepts the CLI
+versions listed in the install section (`0.1.2-alpha.3`, `0.1.2-rc.1`,
+`0.1.5-rc.1`, `0.1.7-alpha.1`).
 
 Provider configuration uses the public provider directory and redacted
 SettingsForms with revision-checked leaf edits. Missing directory entries or
@@ -122,16 +123,16 @@ not been shown to cancel it. Persistent upstream failures and hard context limit
 ## Install (after the tag exists)
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0
 ```
 
 This installs into the `web` profile. Restart DSH yourself and hard-refresh the existing Web GUI; the installer never controls the DSH process.
 
 ```sh
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 status
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 uninstall
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --profile web --source link:<local-path>
-npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.1.8 --help
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 status
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 uninstall
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 --profile web --source link:<local-path>
+npx --yes --ignore-scripts github:shaomingbo/dsh-token-usage#v5.3.0 --help
 ```
 
 `--profile` defaults to `web`. `--source` defaults to the version-derived fixed tag and may also be set with `DSH_TOKEN_USAGE_SOURCE`. The installer requires `dsh` `0.1.2-rc.1`, `0.1.2-alpha.3`, `0.1.5-rc.1`, or `0.1.7-alpha.1` on PATH and delegates every mutation to the public `dsh plugin` CLI with `--ignore-scripts`; it verifies manifest postconditions and reports failures honestly — rc.1 does not promise rollback. If `dsh` is missing, is a different version, or the plugin command fails, the installer fails closed with guidance; there is no direct-manifest fallback.
@@ -210,7 +211,7 @@ npm pack --dry-run --ignore-scripts
 
 `npm run bench:v2` is a development-only analytics benchmark and is not published with the package.
 
-Tests use synthetic data and temporary `DSH_HOME` directories. The native capability's tested composition targets stock DSH `0.1.2-rc.1` on Node 24.18.0/macOS arm64; lower Node versions were not rerun. The installer retains exactly its existing CLI support for `0.1.2-alpha.3` and `0.1.2-rc.1`, rejecting other versions; final-candidate temporary-home install/`--dump-config` checks on both are maintainer release gates. The live acceptance environment had an alpha.3 launcher but actual Web/Basic dependencies at rc.1: this mixed environment is not proof of full native-runtime compatibility on pure alpha.3. The paired compaction package publicly supports rc.1 only; no broader range is claimed.
+Tests use synthetic data and temporary `DSH_HOME` directories. The native capability's tested composition targets stock DSH `0.1.2-rc.1` on Node 24.18.0/macOS arm64; lower Node versions were not rerun. The installer supports the CLI versions `0.1.2-alpha.3`, `0.1.2-rc.1`, `0.1.5-rc.1` and `0.1.7-alpha.1`, rejecting other versions; final-candidate temporary-home install/`--dump-config` checks across them are maintainer release gates. The live acceptance environment had an alpha.3 launcher but actual Web/Basic dependencies at rc.1: this mixed environment is not proof of full native-runtime compatibility on pure alpha.3. The paired compaction package publicly supports 0.1.7-alpha.1 only; no broader range is claimed.
 
 ## Codex native capability (5.1.2)
 
